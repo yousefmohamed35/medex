@@ -1,0 +1,72 @@
+# Uncomment this line to define a global platform for your project
+platform :ios, '15.5'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+ENV['COCOAPODS_DISABLE_STATS'] = 'true'
+
+project 'Runner', {
+  'Debug' => :debug,
+  'Profile' => :release,
+  'Release' => :release,
+}
+
+def flutter_root
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
+  end
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
+  end
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try: flutter pub get"
+end
+
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
+flutter_ios_podfile_setup
+
+target 'Runner' do
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+      # Debug: disable optimization so stepping/variables work in Xcode (fixes flutter_inappwebview_ios warning)
+      if config.name == 'Debug'
+        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
+        config.build_settings['GCC_OPTIMIZATION_LEVEL'] = '0'
+      end
+      # Allow arm64 on simulator for Apple Silicon Macs (mobile_scanner excludes it by default)
+      if target.name == 'mobile_scanner'
+        config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'i386 armv7'
+      end
+    end
+  end
+
+  # Fix DT_TOOLCHAIN_DIR deprecation: use TOOLCHAIN_DIR in LIBRARY_SEARCH_PATHS (Xcode 16+)
+  support_dir = File.join(File.dirname(__FILE__), 'Pods', 'Target Support Files')
+  if File.directory?(support_dir)
+    Dir.glob(File.join(support_dir, '**', '*.xcconfig')).each do |path|
+      content = File.read(path)
+      if content.include?('DT_TOOLCHAIN_DIR')
+        File.write(path, content.gsub('${DT_TOOLCHAIN_DIR}', '$(TOOLCHAIN_DIR)'))
+      end
+    end
+    frameworks_sh = File.join(support_dir, 'Pods-Runner', 'Pods-Runner-frameworks.sh')
+    if File.file?(frameworks_sh)
+      content = File.read(frameworks_sh)
+      if content.include?('DT_TOOLCHAIN_DIR')
+        File.write(frameworks_sh, content.gsub('DT_TOOLCHAIN_DIR', 'TOOLCHAIN_DIR'))
+      end
+    end
+  end
+end
+
