@@ -686,7 +686,7 @@ class _ProgressScreenState extends State<ProgressScreen> {
             ),
 
             // Bottom Navigation
-            const BottomNav(activeTab: 'academy'),
+            // const BottomNav(activeTab: 'academy'),
           ],
         ),
       ),

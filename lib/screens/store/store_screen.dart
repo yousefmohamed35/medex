@@ -263,7 +263,7 @@ class _StoreScreenState extends State<StoreScreen> {
               const SliverToBoxAdapter(child: SizedBox(height: 120)),
             ],
           ),
-          BottomNav(activeTab: 'store'),
+          // BottomNav(activeTab: 'store'),
         ],
       ),
     );

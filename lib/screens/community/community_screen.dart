@@ -289,7 +289,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
               ],
             ),
-            BottomNav(activeTab: 'community'),
+            // BottomNav(activeTab: 'community'),
           ],
         ),
       ),

@@ -461,8 +461,8 @@ class _CourseDetailsScreenState extends State<CourseDetailsScreen>
         ),
       ),
 
-      // Bottom Action Button
-      bottomNavigationBar: _buildBottomBar(course, finalIsFree),
+      // Bottom Action Button (disabled for now)
+      // bottomNavigationBar: _buildBottomBar(course, finalIsFree),
     );
   }
 

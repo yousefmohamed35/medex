@@ -257,7 +257,7 @@ class _EnrolledScreenState extends State<EnrolledScreen> {
             ],
           ),
           // Bottom Navigation
-          const BottomNav(activeTab: 'academy'),
+          // const BottomNav(activeTab: 'academy'),
         ],
       ),
     );

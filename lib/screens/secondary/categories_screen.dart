@@ -568,7 +568,7 @@ class _CategoriesScreenState extends State<CategoriesScreen>
           ),
 
           // Bottom Navigation
-          const BottomNav(activeTab: 'home'),
+          // const BottomNav(activeTab: 'home'),
         ],
       ),
     );

@@ -493,7 +493,7 @@ class _ProductCategoriesScreenState extends State<ProductCategoriesScreen> {
                 ),
               ],
             ),
-            BottomNav(activeTab: 'store'),
+            // BottomNav(activeTab: 'store'),
           ],
         ),
       ),

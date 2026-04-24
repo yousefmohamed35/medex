@@ -247,7 +247,7 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
             ],
           ),
           // Bottom Navigation
-          const BottomNav(activeTab: 'academy'),
+          // const BottomNav(activeTab: 'academy'),
         ],
       ),
     );

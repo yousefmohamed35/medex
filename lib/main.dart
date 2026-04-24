@@ -7,7 +7,6 @@ import 'core/navigation/app_router.dart';
 import 'core/config/app_config_provider.dart';
 import 'core/config/theme_provider.dart';
 import 'l10n/app_localizations.dart';
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 

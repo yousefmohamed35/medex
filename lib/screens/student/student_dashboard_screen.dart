@@ -508,7 +508,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
           ),
 
           // Bottom Navigation
-          const BottomNav(activeTab: 'dashboard'),
+          // const BottomNav(activeTab: 'dashboard'),
         ],
       ),
     );

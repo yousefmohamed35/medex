@@ -5,14 +5,19 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:skeletonizer/skeletonizer.dart';
 import '../../core/design/app_colors.dart';
-import '../../core/design/app_radius.dart';
 import '../../core/navigation/route_names.dart';
 import '../../core/api/api_endpoints.dart';
-import '../../widgets/bottom_nav.dart';
+import '../../widgets/home_media_banner.dart';
+import '../../widgets/home_featured_products_section.dart';
+import '../../widgets/home_implant_community_section.dart';
+import '../../widgets/home_platform_intro_card.dart';
+import '../../widgets/home_promotional_offers_section.dart';
+import '../../widgets/home_quick_access.dart';
 import '../../widgets/premium_course_card.dart';
 import '../../services/home_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/notifications_service.dart';
+import '../../services/cart_service.dart';
 import '../../services/store_service.dart';
 import '../../models/product.dart';
 
@@ -23,10 +28,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
-  final _searchController = TextEditingController();
-  late AnimationController _bannerController;
-  late Animation<double> _bannerAnimation;
+class _HomeScreenState extends State<HomeScreen> {
+  static const bool _showProductCategoriesSection = false;
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -35,21 +38,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   List<Map<String, dynamic>> _featuredCourses = [];
   List<Map<String, dynamic>> _popularCourses = [];
   List<Map<String, dynamic>> _continueLearning = [];
+  Map<String, dynamic>? _heroBanner;
   List<ProductCategory> _storeCategories = [];
   List<Product> _storeProducts = [];
 
   @override
   void initState() {
     super.initState();
-    _bannerController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-    _bannerAnimation = CurvedAnimation(
-      parent: _bannerController,
-      curve: Curves.easeOutBack,
-    );
-    _bannerController.forward();
     _loadHomeData();
   }
 
@@ -113,6 +108,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
       if (!mounted) return;
       setState(() {
+        _heroBanner = homeData['hero_banner'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(homeData['hero_banner'])
+            : null;
         _userProfile = profile;
         _notificationsCount = notifications['meta']?['unread_count'] ?? 0;
         _featuredCourses =
@@ -137,8 +135,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _bannerController.dispose();
     super.dispose();
   }
 
@@ -174,13 +170,57 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const SizedBox(height: 16),
-                              _buildHeroBanner(isAr),
+                              HomeMediaBanner(
+                                isAr: isAr,
+                                mediaType: _resolveBannerType(),
+                                mediaPath: _resolveBannerPath(),
+                                isAsset: _resolveBannerIsAsset(),
+                                onTap: () => context.go(RouteNames.store),
+                              ),
                               const SizedBox(height: 24),
-                              _buildQuickActions(isAr),
+                              HomeQuickAccess(
+                                isAr: isAr,
+                              ),
+                              const SizedBox(height: 20),
+                              HomePlatformIntroCard(isAr: isAr),
                               const SizedBox(height: 24),
-                              _buildProductCategoriesSection(isAr),
+                              HomePromotionalOffersSection(isAr: isAr),
                               const SizedBox(height: 24),
-                              _buildFeaturedProductsSection(isAr),
+                              if (_showProductCategoriesSection)
+                                _buildProductCategoriesSection(isAr),
+                              if (_showProductCategoriesSection)
+                                const SizedBox(height: 24),
+                              HomeFeaturedProductsSection(
+                                isAr: isAr,
+                                isLoading: _isLoading,
+                                products: _getFeaturedProducts(),
+                                onViewAllTap: () =>
+                                    context.go(RouteNames.store),
+                                onProductTap: (product) => context.push(
+                                  RouteNames.productDetails,
+                                  extra: product,
+                                ),
+                                onAddToCartTap: (product) {
+                                  CartService.instance.addToCart(product);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        isAr
+                                            ? 'تمت إضافة المنتج إلى السلة'
+                                            : 'Product added to cart',
+                                      ),
+                                      duration:
+                                          const Duration(milliseconds: 1200),
+                                    ),
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 24),
+                              HomeImplantCommunitySection(
+                                isAr: isAr,
+                                onViewAllTap: () =>
+                                    context.push(RouteNames.community),
+                              ),
                               const SizedBox(height: 24),
                               if (_featuredCourses.isNotEmpty || _isLoading)
                                 _buildCoursesSection(isAr),
@@ -196,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ],
           ),
-          const BottomNav(activeTab: 'home'),
+          // const BottomNav(activeTab: 'home'),
         ],
       ),
     );
@@ -209,361 +249,158 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFD42535), Color(0xFFB01E2D)],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(AppRadius.largeCard),
-          bottomRight: Radius.circular(AppRadius.largeCard),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        color: AppColors.primary,
       ),
       child: Padding(
         padding: EdgeInsets.only(
-          top: statusBarHeight + 16,
-          bottom: 20,
+          top: statusBarHeight + 12,
+          bottom: 12,
           left: 20,
           right: 20,
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                Builder(
-                  builder: (ctx) => GestureDetector(
-                    onTap: () => Scaffold.of(ctx).openDrawer(),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isAr ? 'صباح الخير' : 'Good morning,',
+                    style: GoogleFonts.cairo(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Skeletonizer(
+                    enabled: profilePending,
+                    child: Text(
+                      userName,
+                      style: GoogleFonts.cairo(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.05,
                       ),
-                      child: const Icon(Icons.menu_rounded,
-                          color: Colors.white, size: 24),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isAr ? 'مرحباً 👋' : 'Welcome 👋',
-                        style: GoogleFonts.cairo(
-                            fontSize: 13, color: Colors.white.withOpacity(0.8)),
-                      ),
-                      Skeletonizer(
-                        enabled: profilePending,
-                        child: Text(
-                          userName,
-                          style: GoogleFonts.cairo(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => context.push(RouteNames.notifications),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Stack(
-                      children: [
-                        const Center(
-                            child: Icon(Icons.notifications_rounded,
-                                color: Colors.white, size: 24)),
-                        if (_notificationsCount > 0)
-                          Positioned(
-                            top: 6,
-                            right: 6,
-                            child: Container(
-                              width: 18,
-                              height: 18,
-                              decoration: const BoxDecoration(
-                                  color: Colors.white, shape: BoxShape.circle),
-                              child: Center(
-                                child: Text(
-                                  '$_notificationsCount',
-                                  style: GoogleFonts.cairo(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => context.push(RouteNames.cart),
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(Icons.shopping_cart_rounded,
-                        color: Colors.white, size: 22),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TextField(
-                controller: _searchController,
-                textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-                style: GoogleFonts.cairo(
-                    color: AppColors.primary.withOpacity(0.6)),
-                decoration: InputDecoration(
-                  hintText: isAr
-                      ? 'ابحث عن منتجات أو دورات...'
-                      : 'Search products or courses...',
-                  hintStyle: GoogleFonts.cairo(
-                      color: AppColors.primary.withOpacity(0.6)),
-                  prefixIcon: Icon(Icons.search_rounded,
-                      color: AppColors.primary.withOpacity(0.6)),
-                  border: InputBorder.none,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeroBanner(bool isAr) {
-    return AnimatedBuilder(
-      animation: _bannerAnimation,
-      builder: (context, child) {
-        final t = _bannerAnimation.value;
-        // easeOutBack can overshoot past 1.0; Opacity must stay in [0, 1].
-        return Transform.scale(
-          scale: 0.95 + (t * 0.05),
-          child: Opacity(opacity: t.clamp(0.0, 1.0), child: child),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        height: 200,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFD42535), Color(0xFF8C1722)],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned(
-              right: isAr ? null : -10,
-              left: isAr ? -10 : null,
-              bottom: 0,
-              top: 0,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  'assets/images/medex_hero.png',
-                  height: 200,
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const SizedBox(),
+            GestureDetector(
+              onTap: () => context.push(RouteNames.notifications),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE93A48),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-            ),
-            Positioned(
-              left: isAr ? null : 20,
-              right: isAr ? 20 : null,
-              top: 0,
-              bottom: 0,
-              child: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.5,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Stack(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'MEDEX',
-                        style: GoogleFonts.cairo(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 2),
+                    const Center(
+                      child: Icon(
+                        Icons.notifications_none_rounded,
+                        color: Colors.white,
+                        size: 24,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      isAr
-                          ? 'منتجات طب أسنان\nمتميزة'
-                          : 'Premium Dental\nProducts',
-                      style: GoogleFonts.cairo(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.3),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      isAr
-                          ? 'أفضل المنتجات من إيطاليا وتركيا وكوريا'
-                          : 'Top products from Italy, Turkey & Korea',
-                      style: GoogleFonts.cairo(
-                          fontSize: 11, color: Colors.white.withOpacity(0.85)),
-                    ),
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () => context.go(RouteNames.store),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          isAr ? 'تسوق الآن' : 'Shop Now',
-                          style: GoogleFonts.cairo(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary),
+                    if (_notificationsCount > 0)
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFFFD235),
+                            shape: BoxShape.circle,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: () => context.push(RouteNames.editProfile),
+              child: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE93A48),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.person_outline_rounded,
+                  color: Colors.white,
+                  size: 24,
+                ),
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickActions(bool isAr) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _buildQuickActionItem(
-            Icons.store_rounded,
-            isAr ? 'المتجر' : 'Store',
-            AppColors.primary,
-            () => context.go(RouteNames.store),
-          ),
-          const SizedBox(width: 12),
-          _buildQuickActionItem(
-            Icons.school_rounded,
-            isAr ? 'الدورات' : 'Courses',
-            AppColors.info,
-            () => context.push(RouteNames.allCourses),
-          ),
-          const SizedBox(width: 12),
-          _buildQuickActionItem(
-            Icons.receipt_long_rounded,
-            isAr ? 'طلباتي' : 'Orders',
-            AppColors.success,
-            () => context.push(RouteNames.orders),
-          ),
-          const SizedBox(width: 12),
-          _buildQuickActionItem(
-            Icons.headset_mic_rounded,
-            isAr ? 'تواصل' : 'Contact',
-            AppColors.warning,
-            () => context.push(RouteNames.contactUs),
-          ),
-        ],
-      ),
-    );
+  HomeBannerMediaType _resolveBannerType() {
+    final type = _heroBanner?['media_type']?.toString().toLowerCase().trim();
+    if (type == 'video') return HomeBannerMediaType.video;
+
+    final videoUrl = _heroBanner?['video_url']?.toString();
+    if (videoUrl != null && videoUrl.isNotEmpty) {
+      return HomeBannerMediaType.video;
+    }
+
+    return HomeBannerMediaType.image;
   }
 
-  Widget _buildQuickActionItem(
-      IconData icon, String label, Color color, VoidCallback onTap) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2))
-            ],
-          ),
-          child: Column(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: GoogleFonts.cairo(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.foreground),
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  String _resolveBannerPath() {
+    final type = _resolveBannerType();
+    if (type == HomeBannerMediaType.video) {
+      final videoUrl = _heroBanner?['media_url']?.toString();
+      if (videoUrl != null && videoUrl.isNotEmpty) return videoUrl;
+
+      final fallbackVideoUrl = _heroBanner?['video_url']?.toString();
+      if (fallbackVideoUrl != null && fallbackVideoUrl.isNotEmpty) {
+        return fallbackVideoUrl;
+      }
+    } else {
+      final mediaUrl = _heroBanner?['media_url']?.toString();
+      if (mediaUrl != null && mediaUrl.isNotEmpty) return mediaUrl;
+
+      final image = _heroBanner?['image']?.toString();
+      if (image != null && image.isNotEmpty) return image;
+
+      final backgroundImage = _heroBanner?['background_image']?.toString();
+      if (backgroundImage != null && backgroundImage.isNotEmpty) {
+        return backgroundImage;
+      }
+    }
+
+    return 'assets/images/medex_hero.png';
+  }
+
+  bool _resolveBannerIsAsset() {
+    final path = _resolveBannerPath().toLowerCase();
+    return !(path.startsWith('http://') || path.startsWith('https://'));
+  }
+
+  List<Product> _getFeaturedProducts() {
+    var featuredProducts = _storeProducts
+        .where((p) => (p.discount != null && p.discount! > 0) || p.isRentable)
+        .take(6)
+        .toList();
+    if (featuredProducts.isEmpty && _storeProducts.isNotEmpty) {
+      featuredProducts = _storeProducts.take(6).toList();
+    }
+    return featuredProducts;
   }
 
   Widget _buildProductCategoriesSection(bool isAr) {
@@ -724,6 +561,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  // ignore: unused_element
   Widget _buildFeaturedProductsSection(bool isAr) {
     if (_isLoading) {
       return Column(
