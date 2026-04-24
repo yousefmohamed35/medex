@@ -14,6 +14,7 @@ class RouteNames {
   static const String dashboard = '/dashboard';
 
   static const String store = '/store';
+  static const String storeCategoryListing = '/store-category-listing';
   static const String productDetails = '/product-details';
   static const String cart = '/cart';
   static const String storeCheckout = '/store-checkout';
@@ -42,6 +43,20 @@ class RouteNames {
   static const String enrolled = '/enrolled';
   static const String settings = '/settings';
   static const String allCourses = '/all-courses';
+  static const String medexAcademy = '/medex-academy';
+  static const String medexOffers = '/medex-offers';
+
+  /// [offerId] examples: `bb-implant`, `powerbone`, `macros`
+  static String medexOfferDetailPath(String offerId) =>
+      '/medex-offer-detail/$offerId';
+  static const String clinicalCases = '/clinical-cases';
+  static const String productLearningHub = '/product-learning-hub';
+  static const String eventsExhibitions = '/events-exhibitions';
+  static const String eventDetails = '/event-details';
+  static const String dentalChallenge = '/dental-challenge';
+  static const String returnsExchanges = '/returns-exchanges';
+  static const String returnsPolicies = '/returns-policies';
+  static const String medexAiAssistant = '/medex-ai-assistant';
   static const String editProfile = '/edit-profile';
   static const String changePassword = '/change-password';
   static const String pdfViewer = '/pdf-viewer';
@@ -52,6 +67,7 @@ class RouteNames {
   static const String contactUs = '/contact-us';
   static const String productCategories = '/product-categories';
   static const String community = '/community';
+  static const String implantCommunity = '/implant-community';
   static const String postDetail = '/post-detail';
   static const String createPost = '/create-post';
 

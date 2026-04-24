@@ -715,44 +715,59 @@ class _AllCoursesScreenState extends State<AllCoursesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Category
-                    if (categoryName.isNotEmpty)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.purple.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          categoryName,
-                          style: GoogleFonts.cairo(
-                              fontSize: 9,
-                              color: AppColors.purple,
-                              fontWeight: FontWeight.w600),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Category
+                            if (categoryName.isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.purple.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  categoryName,
+                                  style: GoogleFonts.cairo(
+                                      fontSize: 9,
+                                      color: AppColors.purple,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            if (categoryName.isNotEmpty)
+                              const SizedBox(height: 6),
+                            // Title
+                            Text(
+                              course['title']?.toString() ??
+                                  context.l10n.noTitle,
+                              style: GoogleFonts.cairo(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.foreground),
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            // Instructor
+                            if (instructorName.isNotEmpty)
+                              Text(
+                                instructorName,
+                                style: GoogleFonts.cairo(
+                                    fontSize: 10,
+                                    color: AppColors.mutedForeground),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
                         ),
                       ),
-                    if (categoryName.isNotEmpty) const SizedBox(height: 6),
-                    // Title
-                    Text(
-                      course['title']?.toString() ?? context.l10n.noTitle,
-                      style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.foreground),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 4),
-                    // Instructor
-                    if (instructorName.isNotEmpty)
-                      Text(
-                        instructorName,
-                        style: GoogleFonts.cairo(
-                            fontSize: 10, color: AppColors.mutedForeground),
-                      ),
-                    const Spacer(),
-                    // Stats
+                    // Stats (pinned to bottom of card content area)
                     Row(
                       children: [
                         const Icon(Icons.star_rounded,
