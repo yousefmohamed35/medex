@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/design/app_colors.dart';
 import '../../core/navigation/route_names.dart';
+import '../../data/sample_products.dart';
+import '../../models/product.dart';
 import '../../services/cart_service.dart';
 import '../../widgets/bottom_nav.dart';
 
@@ -27,10 +29,43 @@ class _StoreScreenState extends State<StoreScreen> {
   _StoreSectionData get _activeSection => _storeSections[_selectedRailIndex];
 
   List<_StoreFeaturedProduct> get _activeFeaturedProducts {
-    final items = _activeSection.featuredProducts;
-    if (_searchQuery.trim().isEmpty) return items;
-    final q = _searchQuery.toLowerCase();
-    return items.where((p) => p.name.toLowerCase().contains(q)).toList();
+    // Always show featured picks for the active brand.
+    return _activeSection.featuredProducts;
+  }
+
+  List<_StoreCategoryCardData> get _visibleCategories {
+    final list = _activeSection.categories;
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return list;
+    return list
+        .where((c) =>
+            c.title.toLowerCase().replaceAll('\n', ' ').contains(q))
+        .toList();
+  }
+
+  String _normalizeCategoryTitle(String title) =>
+      title.replaceAll('\n', ' ').trim();
+
+  void _openCategoryListing(String categoryTitle) {
+    final cat = _normalizeCategoryTitle(categoryTitle);
+    context.push(
+      '${RouteNames.storeCategoryListing}?brand=$_selectedRailIndex&cat=${Uri.encodeComponent(cat)}',
+    );
+  }
+
+  void _openDefaultCategoryListing() {
+    final section = _activeSection;
+    final first = section.categories.isNotEmpty
+        ? section.categories.first.title
+        : 'Implant Systems';
+    _openCategoryListing(first);
+  }
+
+  Product? _productById(String id) {
+    for (final p in SampleProducts.products) {
+      if (p.id == id) return p;
+    }
+    return null;
   }
 
   @override
@@ -75,15 +110,22 @@ class _StoreScreenState extends State<StoreScreen> {
       padding: const EdgeInsets.fromLTRB(10, 36, 10, 10),
       child: Row(
         children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF43446),
-              borderRadius: BorderRadius.circular(12),
+          GestureDetector(
+            onTap: () => context.go(RouteNames.home),
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF43446),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.home_outlined,
+                color: Colors.white,
+                size: 21,
+              ),
             ),
-            child:
-                const Icon(Icons.home_outlined, color: Colors.white, size: 21),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -247,7 +289,7 @@ class _StoreScreenState extends State<StoreScreen> {
 
   Widget _buildRightPanel(bool isAr) {
     final section = _activeSection;
-    final categories = section.categories;
+    final categories = _visibleCategories;
     final featured = _activeFeaturedProducts;
     return Container(
       color: const Color(0xFFE9EBF0),
@@ -256,45 +298,53 @@ class _StoreScreenState extends State<StoreScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFDADDE5)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          section.title,
-                          style: GoogleFonts.cairo(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          '${section.country} · ${section.totalProducts} Products',
-                          style: GoogleFonts.cairo(
-                            fontSize: 11,
-                            color: const Color(0xFF7D8391),
-                          ),
-                        ),
-                      ],
-                    ),
+                onTap: _openDefaultCategoryListing,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFDADDE5)),
                   ),
-                  Text(
-                    isAr ? 'كل المنتجات >' : 'All Products >',
-                    style: GoogleFonts.cairo(
-                      color: AppColors.primary,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  )
-                ],
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              section.title,
+                              style: GoogleFonts.cairo(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            Text(
+                              '${section.country} · ${section.totalProducts} Products',
+                              style: GoogleFonts.cairo(
+                                fontSize: 11,
+                                color: const Color(0xFF7D8391),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        isAr ? 'كل التصنيفات >' : 'All Categories >',
+                        style: GoogleFonts.cairo(
+                          color: AppColors.primary,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 10),
@@ -320,47 +370,54 @@ class _StoreScreenState extends State<StoreScreen> {
               ),
               itemBuilder: (context, index) {
                 final c = categories[index];
-                return Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF2F3F6),
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFD7DAE2)),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.07),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(
-                          c.icon,
-                          color: AppColors.primary,
-                          size: 21,
-                        ),
+                    onTap: () => _openCategoryListing(c.title),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F3F6),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFD7DAE2)),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        c.title,
-                        style: GoogleFonts.cairo(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 2,
-                        textAlign: TextAlign.center,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.07),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              c.icon,
+                              color: AppColors.primary,
+                              size: 21,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            c.title,
+                            style: GoogleFonts.cairo(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            maxLines: 2,
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${c.itemsCount} Items',
+                            style: GoogleFonts.cairo(
+                              fontSize: 10.8,
+                              color: const Color(0xFF98A0AE),
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        '${c.itemsCount} Items',
-                        style: GoogleFonts.cairo(
-                          fontSize: 10.8,
-                          color: const Color(0xFF98A0AE),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 );
               },
@@ -383,92 +440,192 @@ class _StoreScreenState extends State<StoreScreen> {
     );
   }
 
-  Widget _buildFeaturedTile(_StoreFeaturedProduct p, bool isAr) {
-    return GestureDetector(
-      onTap: () {},
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FA),
+  Widget _buildFeaturedTile(_StoreFeaturedProduct f, bool isAr) {
+    final product = _productById(f.productId);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD7DAE2)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.circle_outlined,
-                color: AppColors.primary,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.name,
-                    style: GoogleFonts.cairo(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+          onTap: () {
+            if (product == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isAr ? 'المنتج غير متوفر' : 'Product unavailable',
+                    style: GoogleFonts.cairo(),
                   ),
-                  Text(
-                    p.inStock ? 'In Stock' : 'Out of Stock',
-                    style: GoogleFonts.cairo(
-                      fontSize: 10.8,
-                      color: p.inStock
-                          ? const Color(0xFF17A34A)
-                          : const Color(0xFF9CA3AF),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    'EGP ${p.price}',
-                    style: GoogleFonts.cairo(
-                      fontSize: 14.5,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    duration: const Duration(milliseconds: 900),
-                    content: Text(
-                      isAr ? 'تمت الإضافة للسلة' : 'Added to cart',
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(8),
                 ),
-                child:
-                    const Icon(Icons.add, color: AppColors.primary, size: 20),
-              ),
+              );
+              return;
+            }
+            context.push(RouteNames.productDetails, extra: product);
+          },
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFD7DAE2)),
             ),
-          ],
+            child: Row(
+              children: [
+                _featuredThumb(product),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        f.name,
+                        style: GoogleFonts.cairo(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        f.inStock
+                            ? (isAr ? 'متوفر' : 'In Stock')
+                            : (isAr ? 'غير متوفر' : 'Out of Stock'),
+                        style: GoogleFonts.cairo(
+                          fontSize: 10.8,
+                          color: f.inStock
+                              ? const Color(0xFF17A34A)
+                              : const Color(0xFF9CA3AF),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'EGP ${f.price}',
+                        style: GoogleFonts.cairo(
+                          fontSize: 14.5,
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Material(
+                  color: const Color(0xFFFFF0F1),
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      if (product == null || !product.isAvailable) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            duration: const Duration(milliseconds: 900),
+                            content: Text(
+                              isAr
+                                  ? 'لا يمكن إضافة هذا المنتج'
+                                  : 'This product cannot be added',
+                              style: GoogleFonts.cairo(),
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      CartService.instance.addToCart(product, isRental: false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          duration: const Duration(milliseconds: 900),
+                          content: Text(
+                            isAr ? 'تمت الإضافة للسلة' : 'Added to cart',
+                            style: GoogleFonts.cairo(),
+                          ),
+                        ),
+                      );
+                    },
+                    child: SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: Icon(
+                        Icons.add_rounded,
+                        color: product != null && product.isAvailable
+                            ? AppColors.primary
+                            : const Color(0xFFCBD5E1),
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _featuredThumb(Product? product) {
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8EAEF),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFD0D5DD)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: product == null
+          ? const Center(
+              child: Icon(Icons.image_not_supported_outlined,
+                  size: 20, color: Color(0xFF98A2B3)),
+            )
+          : _featuredThumbImage(product),
+    );
+  }
+
+  bool _isNetworkImage(String path) {
+    final x = path.toLowerCase();
+    return x.startsWith('http://') || x.startsWith('https://');
+  }
+
+  Widget _featuredThumbImage(Product product) {
+    if (_isNetworkImage(product.imageUrl)) {
+      return Image.network(
+        product.imageUrl,
+        fit: BoxFit.cover,
+        width: 46,
+        height: 46,
+        errorBuilder: (_, __, ___) => Center(child: _featuredRing()),
+      );
+    }
+    return Image.asset(
+      product.imageUrl,
+      fit: BoxFit.cover,
+      width: 46,
+      height: 46,
+      errorBuilder: (_, __, ___) => Center(child: _featuredRing()),
+    );
+  }
+
+  Widget _featuredRing() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.primary, width: 2),
+          ),
+        ),
+        Container(
+          width: 12,
+          height: 12,
+          decoration: const BoxDecoration(
+            color: Color(0xFFC8CDD4),
+            shape: BoxShape.circle,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -499,9 +656,20 @@ const List<_StoreSectionData> _storeSections = [
     ],
     featuredProducts: [
       _StoreFeaturedProduct(
-          name: 'B&B Implant System -\nStraight', price: '4,500'),
-      _StoreFeaturedProduct(name: 'B&B Titanium\nAbutment', price: '2,800'),
-      _StoreFeaturedProduct(name: 'B&B Short Implant', price: '4,200'),
+        productId: '1',
+        name: 'B&B Implant System -\nStraight',
+        price: '4,500',
+      ),
+      _StoreFeaturedProduct(
+        productId: '2',
+        name: 'B&B Titanium\nAbutment',
+        price: '2,800',
+      ),
+      _StoreFeaturedProduct(
+        productId: '16',
+        name: 'B&B Short Implant',
+        price: '4,800',
+      ),
     ],
   ),
   _StoreSectionData(
@@ -521,9 +689,16 @@ const List<_StoreSectionData> _storeSections = [
     ],
     featuredProducts: [
       _StoreFeaturedProduct(
-          name: 'Macros Tapered\nImplant 4.2mm', price: '3,900'),
+        productId: '20',
+        name: 'Macros Tapered\nImplant 4.2mm',
+        price: '3,900',
+      ),
       _StoreFeaturedProduct(
-          name: 'Macros Bone Level\nImplant', price: '4,100', inStock: false),
+        productId: '21',
+        name: 'Macros Bone Level\nImplant',
+        price: '4,100',
+        inStock: false,
+      ),
     ],
   ),
   _StoreSectionData(
@@ -540,10 +715,22 @@ const List<_StoreSectionData> _storeSections = [
           icon: Icons.crop_square_outlined),
     ],
     featuredProducts: [
-      _StoreFeaturedProduct(name: 'Powerbone Surgical Kit', price: '12,500'),
-      _StoreFeaturedProduct(name: 'Powerbone Compact\nKit', price: '9,800'),
       _StoreFeaturedProduct(
-          name: 'Powerbone Expansion\nKit', price: '14,200', inStock: false),
+        productId: '8',
+        name: 'Powerbone Surgical Kit',
+        price: '12,000',
+      ),
+      _StoreFeaturedProduct(
+        productId: '23',
+        name: 'Powerbone Compact\nKit',
+        price: '9,800',
+      ),
+      _StoreFeaturedProduct(
+        productId: '22',
+        name: 'Powerbone Expansion\nKit',
+        price: '14,200',
+        inStock: false,
+      ),
     ],
   ),
   _StoreSectionData(
@@ -558,8 +745,16 @@ const List<_StoreSectionData> _storeSections = [
           title: 'Abutments', itemsCount: 10, icon: Icons.add),
     ],
     featuredProducts: [
-      _StoreFeaturedProduct(name: 'MCTBIO BL Implant\n3.8mm', price: '2,600'),
-      _StoreFeaturedProduct(name: 'MCTBIO TL Implant\n4.5mm', price: '2,900'),
+      _StoreFeaturedProduct(
+        productId: '9',
+        name: 'MCTBIO Implant Fixture\n4.5×13mm',
+        price: '3,200',
+      ),
+      _StoreFeaturedProduct(
+        productId: '10',
+        name: 'MCTBIO Digital Scan Body',
+        price: '800',
+      ),
     ],
   ),
   _StoreSectionData(
@@ -578,8 +773,16 @@ const List<_StoreSectionData> _storeSections = [
           title: 'Regenerative', itemsCount: 6, icon: Icons.sync_outlined),
     ],
     featuredProducts: [
-      _StoreFeaturedProduct(name: 'OsseoGraft 1.0g', price: '680'),
-      _StoreFeaturedProduct(name: 'Collagen Membrane\n25×25mm', price: '950'),
+      _StoreFeaturedProduct(
+        productId: '24',
+        name: 'OsseoGraft 1.0g',
+        price: '680',
+      ),
+      _StoreFeaturedProduct(
+        productId: '25',
+        name: 'Collagen Membrane\n25×25mm',
+        price: '950',
+      ),
     ],
   ),
 ];
@@ -622,11 +825,13 @@ class _StoreCategoryCardData {
 }
 
 class _StoreFeaturedProduct {
+  final String productId;
   final String name;
   final String price;
   final bool inStock;
 
   const _StoreFeaturedProduct({
+    required this.productId,
     required this.name,
     required this.price,
     this.inStock = true,

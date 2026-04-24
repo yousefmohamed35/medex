@@ -385,7 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 10),
             GestureDetector(
-              onTap: () => context.push(RouteNames.editProfile),
+              onTap: () => context.go(RouteNames.dashboard),
               child: Container(
                 width: 44,
                 height: 44,

@@ -50,9 +50,23 @@ class HomeQuickAccess extends StatelessWidget {
                   if (index == 0) {
                     context.go(RouteNames.store);
                   } else if (index == 1) {
-                    context.go(RouteNames.community);
+                    context.go(RouteNames.implantCommunity);
                   } else if (index == 2) {
-                    context.go(RouteNames.allCourses);
+                    context.go(RouteNames.medexAcademy);
+                  } else if (index == 3) {
+                    context.go(RouteNames.medexOffers);
+                  } else if (index == 4) {
+                    context.go(RouteNames.clinicalCases);
+                  } else if (index == 5) {
+                    context.go(RouteNames.productLearningHub);
+                  } else if (index == 6) {
+                    context.go(RouteNames.eventsExhibitions);
+                  } else if (index == 7) {
+                    context.go(RouteNames.dentalChallenge);
+                  } else if (index == 8) {
+                    context.go(RouteNames.returnsExchanges);
+                  } else if (index == 9) {
+                    context.go(RouteNames.medexAiAssistant);
                   }
                 },
               );

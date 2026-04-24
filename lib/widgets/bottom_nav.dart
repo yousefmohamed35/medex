@@ -76,7 +76,7 @@ class BottomNav extends StatelessWidget {
                     label: communityLabel,
                     id: 'community',
                     activeTab: activeTab,
-                    onTap: () => context.go(RouteNames.community),
+                    onTap: () => context.go(RouteNames.implantCommunity),
                   ),
                 ),
                 Expanded(
@@ -86,7 +86,7 @@ class BottomNav extends StatelessWidget {
                     label: academyLabel,
                     id: 'academy',
                     activeTab: activeTab,
-                    onTap: () => context.go(RouteNames.allCourses),
+                    onTap: () => context.go(RouteNames.medexAcademy),
                   ),
                 ),
                 Expanded(

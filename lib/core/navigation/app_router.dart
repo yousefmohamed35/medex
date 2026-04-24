@@ -30,6 +30,17 @@ import '../../screens/secondary/certificates_screen.dart';
 import '../../screens/secondary/enrolled_screen.dart';
 import '../../screens/secondary/settings_screen.dart';
 import '../../screens/secondary/all_courses_screen.dart';
+import '../../screens/secondary/medex_academy_placeholder_screen.dart';
+import '../../screens/secondary/medex_offers_placeholder_screen.dart';
+import '../../screens/secondary/medex_offer_detail_screen.dart';
+import '../../screens/secondary/clinical_cases_placeholder_screen.dart';
+import '../../screens/secondary/product_learning_hub_screen.dart';
+import '../../screens/secondary/events_exhibitions_placeholder_screen.dart';
+import '../../screens/secondary/event_details_screen.dart';
+import '../../screens/secondary/dental_challenge_screen.dart';
+import '../../screens/secondary/returns_exchanges_screen.dart';
+import '../../screens/secondary/returns_policies_screen.dart';
+import '../../screens/secondary/medex_ai_assistant_screen.dart';
 import '../../screens/secondary/edit_profile_screen.dart';
 import '../../screens/secondary/change_password_screen.dart';
 import '../../screens/secondary/pdf_viewer_screen.dart';
@@ -41,6 +52,7 @@ import '../../screens/secondary/chat_messages_screen.dart';
 import '../../screens/secondary/privacy_security_screen.dart';
 import '../../screens/secondary/contact_us_screen.dart';
 import '../../screens/store/store_screen.dart';
+import '../../screens/store/store_category_listing_screen.dart';
 import '../../screens/store/product_details_screen.dart';
 import '../../screens/store/cart_screen.dart';
 import '../../screens/store/store_checkout_screen.dart';
@@ -48,6 +60,7 @@ import '../../screens/store/orders_screen.dart';
 import '../../screens/store/category_products_screen.dart';
 import '../../screens/store/product_categories_screen.dart';
 import '../../screens/community/community_screen.dart';
+import '../../screens/community/implant_community_screen.dart';
 import '../../screens/community/post_detail_screen.dart';
 import '../../screens/community/create_post_screen.dart';
 import '../../models/product.dart';
@@ -185,6 +198,94 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: RouteNames.medexAcademy,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const MedexAcademyPlaceholderScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.medexOffers,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const MedexOffersPlaceholderScreen(),
+        ),
+      ),
+      GoRoute(
+        path: '/medex-offer-detail/:offerId',
+        pageBuilder: (context, state) {
+          final id = state.pathParameters['offerId'] ?? 'bb-implant';
+          return _buildPageWithTransition(
+            key: state.pageKey,
+            child: MedexOfferDetailScreen(offerId: id),
+          );
+        },
+      ),
+      GoRoute(
+        path: RouteNames.clinicalCases,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const ClinicalCasesPlaceholderScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.productLearningHub,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const ProductLearningHubScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.eventsExhibitions,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const EventsExhibitionsPlaceholderScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.eventDetails,
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          final args = extra is EventDetailArgs ? extra : null;
+          return _buildPageWithTransition(
+            key: state.pageKey,
+            child: EventDetailsScreen(args: args),
+          );
+        },
+      ),
+      GoRoute(
+        path: RouteNames.dentalChallenge,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const DentalChallengeScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.returnsExchanges,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const ReturnsExchangesScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.returnsPolicies,
+        pageBuilder: (context, state) {
+          final extra = state.extra;
+          final idx = extra is int ? extra : null;
+          return _buildPageWithTransition(
+            key: state.pageKey,
+            child: ReturnsPoliciesScreen(initialExpandedIndex: idx),
+          );
+        },
+      ),
+      GoRoute(
+        path: RouteNames.medexAiAssistant,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const MedexAiAssistantScreen(),
+        ),
+      ),
+      GoRoute(
         path: RouteNames.teachers,
         pageBuilder: (context, state) {
           final extra = state.extra;
@@ -206,6 +307,21 @@ class AppRouter {
           key: state.pageKey,
           child: const StoreScreen(),
         ),
+      ),
+      GoRoute(
+        path: RouteNames.storeCategoryListing,
+        pageBuilder: (context, state) {
+          final brand =
+              int.tryParse(state.uri.queryParameters['brand'] ?? '') ?? 0;
+          final cat = state.uri.queryParameters['cat'] ?? 'Implant Systems';
+          return _buildPageWithTransition(
+            key: state.pageKey,
+            child: StoreCategoryListingScreen(
+              initialBrandRail: brand,
+              categoryTitle: cat,
+            ),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.productDetails,
@@ -266,6 +382,13 @@ class AppRouter {
         pageBuilder: (context, state) => _buildPageWithTransition(
           key: state.pageKey,
           child: const CommunityScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.implantCommunity,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: const ImplantCommunityScreen(),
         ),
       ),
       GoRoute(
