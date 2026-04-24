@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/design/app_colors.dart';
+import '../core/navigation/route_names.dart';
 
 class HomeQuickAccess extends StatelessWidget {
   const HomeQuickAccess({
@@ -42,7 +44,18 @@ class HomeQuickAccess extends StatelessWidget {
             ),
             itemBuilder: (context, index) {
               final item = items[index];
-              return _QuickAccessItem(item: item);
+              return _QuickAccessItem(
+                item: item,
+                onTap: () {
+                  if (index == 0) {
+                    context.go(RouteNames.store);
+                  } else if (index == 1) {
+                    context.go(RouteNames.community);
+                  } else if (index == 2) {
+                    context.go(RouteNames.allCourses);
+                  }
+                },
+              );
             },
           ),
         ],
@@ -54,45 +67,50 @@ class HomeQuickAccess extends StatelessWidget {
 class _QuickAccessItem extends StatelessWidget {
   const _QuickAccessItem({
     required this.item,
+    required this.onTap,
   });
 
   final _QuickAccessItemData item;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F3),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE1E2E6)),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: item.color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(9),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F0F3),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE1E2E6)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                color: item.color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(item.icon, color: item.color, size: 18),
             ),
-            child: Icon(item.icon, color: item.color, size: 18),
-          ),
-          const SizedBox(height: 5),
-          Text(
-            item.label,
-            style: GoogleFonts.cairo(
-              fontSize: 9.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.foreground,
-              height: 1.15,
+            const SizedBox(height: 5),
+            Text(
+              item.label,
+              style: GoogleFonts.cairo(
+                fontSize: 9.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.foreground,
+                height: 1.15,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

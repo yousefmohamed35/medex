@@ -14,6 +14,7 @@ import '../../widgets/home_platform_intro_card.dart';
 import '../../widgets/home_promotional_offers_section.dart';
 import '../../widgets/home_quick_access.dart';
 import '../../widgets/premium_course_card.dart';
+import '../../widgets/bottom_nav.dart';
 import '../../services/home_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/notifications_service.dart';
@@ -236,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          // const BottomNav(activeTab: 'home'),
+          const BottomNav(activeTab: 'home'),
         ],
       ),
     );
