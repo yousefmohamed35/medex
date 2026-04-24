@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_endpoints.dart';
@@ -125,6 +127,9 @@ class HomeService {
         print('URL: ${ApiEndpoints.home}');
         print('Require Auth: true');
         print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        print('📤 HOME BANNER (hero_banner) — same request as home');
+        print('  Field expected in JSON: data.hero_banner (object or null)');
+        print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       }
 
       final response = await ApiClient.instance.get(
@@ -154,6 +159,20 @@ class HomeService {
               '  - Popular Courses Count: ${(data['popular_courses'] as List?)?.length ?? 0}');
           print(
               '  - Continue Learning Count: ${(data['continue_learning'] as List?)?.length ?? 0}');
+          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+          final rawBanner = data['hero_banner'];
+          print('📥 HOME BANNER RESPONSE (raw data.hero_banner from API)');
+          print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+          if (rawBanner == null) {
+            print('(null — no hero_banner in payload)');
+          } else {
+            try {
+              print(const JsonEncoder.withIndent('  ').convert(rawBanner));
+            } catch (_) {
+              print(rawBanner.toString());
+            }
+          }
           print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         }
       }
@@ -202,6 +221,17 @@ class HomeService {
           final heroBanner = processedData['hero_banner'];
           if (heroBanner is Map<String, dynamic>) {
             processedData['hero_banner'] = _processHeroBanner(heroBanner);
+            if (kDebugMode) {
+              print('📥 HOME BANNER (after URL processing for images)');
+              print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+              try {
+                print(const JsonEncoder.withIndent('  ')
+                    .convert(processedData['hero_banner']));
+              } catch (_) {
+                print(processedData['hero_banner'].toString());
+              }
+              print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            }
           }
         }
 

@@ -10,6 +10,12 @@ import '../../core/api/api_endpoints.dart';
 import '../../widgets/home_media_banner.dart';
 import '../../widgets/home_featured_products_section.dart';
 import '../../widgets/home_implant_community_section.dart';
+import '../../widgets/home_clinical_cases_section.dart';
+import '../../widgets/home_events_exhibitions_section.dart';
+import '../../widgets/home_medex_dental_challenge_section.dart';
+import '../../widgets/home_dental_challenge_leaderboard_section.dart';
+import '../../widgets/home_product_learning_hub_section.dart';
+import '../../widgets/home_medex_academy_section.dart';
 import '../../widgets/home_platform_intro_card.dart';
 import '../../widgets/home_promotional_offers_section.dart';
 import '../../widgets/home_quick_access.dart';
@@ -187,10 +193,10 @@ class _HomeScreenState extends State<HomeScreen> {
                               const SizedBox(height: 24),
                               HomePromotionalOffersSection(isAr: isAr),
                               const SizedBox(height: 24),
-                              if (_showProductCategoriesSection)
-                                _buildProductCategoriesSection(isAr),
-                              if (_showProductCategoriesSection)
-                                const SizedBox(height: 24),
+                              // if (_showProductCategoriesSection)
+                              //   _buildProductCategoriesSection(isAr),
+                              // if (_showProductCategoriesSection)
+                              //   const SizedBox(height: 24),
                               HomeFeaturedProductsSection(
                                 isAr: isAr,
                                 isLoading: _isLoading,
@@ -217,19 +223,69 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                               ),
                               const SizedBox(height: 24),
+
                               HomeImplantCommunitySection(
                                 isAr: isAr,
                                 onViewAllTap: () =>
                                     context.push(RouteNames.community),
                               ),
                               const SizedBox(height: 24),
-                              if (_featuredCourses.isNotEmpty || _isLoading)
-                                _buildCoursesSection(isAr),
-                              if (_continueLearning.isNotEmpty)
-                                _buildContinueLearningSection(isAr),
-                              if (_popularCourses.isNotEmpty || _isLoading)
-                                _buildPopularCoursesSection(isAr),
-                              const SizedBox(height: 140),
+                              HomeMedexAcademySection(
+                                isAr: isAr,
+                                onViewAllTap: () =>
+                                    context.go(RouteNames.allCourses),
+                                onCourseTap: (_) =>
+                                    context.go(RouteNames.allCourses),
+                              ),
+                              const SizedBox(height: 24),
+                              HomeClinicalCasesSection(
+                                isAr: isAr,
+                                onViewAllTap: () =>
+                                    context.push(RouteNames.community),
+                                onCaseTap: (_) =>
+                                    context.push(RouteNames.community),
+                              ),
+
+                              const SizedBox(height: 24),
+                              HomeProductLearningHubSection(
+                                isAr: isAr,
+                                onViewAllTap: () =>
+                                    context.go(RouteNames.store),
+                                onItemTap: (_) => context.go(RouteNames.store),
+                              ),
+                              const SizedBox(height: 24),
+                              HomeEventsExhibitionsSection(
+                                isAr: isAr,
+                                onViewAllTap: () =>
+                                    context.go(RouteNames.liveCourses),
+                                onEventTap: (_) =>
+                                    context.go(RouteNames.liveCourses),
+                              ),
+                              const SizedBox(height: 24),
+                              HomeMedexDentalChallengeSection(
+                                isAr: isAr,
+                                onViewAllTap: () =>
+                                    context.push(RouteNames.community),
+                                onJoinTap: () =>
+                                    context.push(RouteNames.community),
+                              ),
+
+                              HomeDentalChallengeLeaderboardSection(
+                                isAr: isAr,
+                                onViewAllTap: () =>
+                                    context.push(RouteNames.community),
+                                onParticipantTap: (_) =>
+                                    context.push(RouteNames.community),
+                              ),
+
+                              const SizedBox(height: 120),
+                              // if (_featuredCourses.isNotEmpty || _isLoading)
+                              //   _buildCoursesSection(isAr),
+                              // if (_continueLearning.isNotEmpty)
+                              //   _buildContinueLearningSection(isAr),
+                              // if (_popularCourses.isNotEmpty || _isLoading)
+                              //   _buildPopularCoursesSection(isAr),
+                              // const SizedBox(height: 140),
                             ],
                           ),
                         ),
