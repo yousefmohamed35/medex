@@ -36,8 +36,12 @@ class StoreService {
     String? brand,
     String? sort,
   }) async {
-    log('getProducts: page=$page, perPage=$perPage, search=$search, categoryId=$categoryId, subcategory=$subcategory, brand=$brand, sort=$sort',
-        name: 'StoreService');
+    if (kDebugMode) {
+      log(
+        'getProducts: page=$page, perPage=$perPage, search=$search, categoryId=$categoryId, subcategory=$subcategory, brand=$brand, sort=$sort',
+        name: 'StoreService',
+      );
+    }
     final query = <String, String>{
       'page': '$page',
       'per_page': '$perPage',
@@ -57,7 +61,6 @@ class StoreService {
     if (response['success'] != true) {
       throw Exception(response['message'] ?? 'Failed to fetch products');
     }
-    log('products is $response');
     if (kDebugMode) {
       final data = response['data'];
       final n = data is Map && data['products'] is List

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -7,38 +8,58 @@ import 'core/navigation/app_router.dart';
 import 'core/config/app_config_provider.dart';
 import 'core/config/theme_provider.dart';
 import 'l10n/app_localizations.dart';
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
 
-  // Warm up SharedPreferences on iOS; if channel fails, app still opens (login save may need retry)
-  try {
-    await SharedPreferences.getInstance();
-  } on PlatformException catch (e) {
-    if (e.code == 'channel-error') {
-      debugPrint(
-          'SharedPreferences channel not ready at startup — app will continue');
-    } else {
-      rethrow;
+Future<void> main() async {
+  await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      debugPrint('Flutter framework error: ${details.exception}');
+      debugPrintStack(stackTrace: details.stack);
+    };
+
+    WidgetsBinding.instance.platformDispatcher.onError =
+        (Object error, StackTrace stack) {
+      debugPrint('Uncaught async error: $error');
+      debugPrintStack(stackTrace: stack);
+      // Handled to avoid silent process termination in debug sessions.
+      return true;
+    };
+
+    // Warm up SharedPreferences on iOS; if channel fails, app still opens (login save may need retry)
+    try {
+      await SharedPreferences.getInstance();
+    } on PlatformException catch (e) {
+      if (e.code == 'channel-error') {
+        debugPrint(
+            'SharedPreferences channel not ready at startup — app will continue');
+      } else {
+        rethrow;
+      }
     }
-  }
 
-  // App config: remote GET /config/app disabled — use `initialize()` again to re-enable.
-  final configProvider = AppConfigProvider();
-  // configProvider.initialize();
-  configProvider.skipRemoteFetch();
+    // App config: remote GET /config/app disabled — use `initialize()` again to re-enable.
+    final configProvider = AppConfigProvider();
+    // configProvider.initialize();
+    configProvider.skipRemoteFetch();
 
-  // Initialize theme provider; if prefs fail, use defaults
-  final themeProvider = ThemeProvider.instance;
-  try {
-    await themeProvider.ensureInitialized();
-  } catch (e) {
-    debugPrint('ThemeProvider init error (using defaults): $e');
-  }
+    // Initialize theme provider; if prefs fail, use defaults
+    final themeProvider = ThemeProvider.instance;
+    try {
+      await themeProvider.ensureInitialized();
+    } catch (e) {
+      debugPrint('ThemeProvider init error (using defaults): $e');
+    }
 
-  runApp(EducationalApp(
-    configProvider: configProvider,
-    themeProvider: themeProvider,
-  ));
+    runApp(EducationalApp(
+      configProvider: configProvider,
+      themeProvider: themeProvider,
+    ));
+  }, (error, stack) {
+    debugPrint('Uncaught zone error: $error');
+    debugPrintStack(stackTrace: stack);
+  });
 }
 
 class EducationalApp extends StatelessWidget {

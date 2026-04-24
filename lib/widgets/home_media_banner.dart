@@ -30,6 +30,7 @@ class HomeMediaBanner extends StatefulWidget {
 class _HomeMediaBannerState extends State<HomeMediaBanner> {
   VideoPlayerController? _videoController;
   bool _isVideoReady = false;
+  int _videoInitEpoch = 0;
 
   @override
   void initState() {
@@ -54,21 +55,40 @@ class _HomeMediaBannerState extends State<HomeMediaBanner> {
   }
 
   Future<void> _initVideo() async {
+    final initEpoch = ++_videoInitEpoch;
     final controller = widget.isAsset
         ? VideoPlayerController.asset(widget.mediaPath)
         : VideoPlayerController.networkUrl(Uri.parse(widget.mediaPath));
     _videoController = controller;
-    await controller.initialize();
-    await controller.setLooping(true);
-    await controller.setVolume(0);
-    await controller.play();
-    if (!mounted) return;
-    setState(() {
-      _isVideoReady = true;
-    });
+
+    try {
+      await controller.initialize();
+      if (!mounted || initEpoch != _videoInitEpoch) {
+        await controller.dispose();
+        return;
+      }
+
+      await controller.setLooping(true);
+      await controller.setVolume(0);
+      await controller.play();
+      if (!mounted || initEpoch != _videoInitEpoch) return;
+
+      setState(() {
+        _isVideoReady = true;
+      });
+    } catch (e) {
+      // Keep Home screen alive even if banner media is invalid/unavailable.
+      if (controller == _videoController) {
+        _disposeVideo();
+      } else {
+        await controller.dispose();
+      }
+      debugPrint('HomeMediaBanner video init failed: $e');
+    }
   }
 
   void _disposeVideo() {
+    _videoInitEpoch++;
     _videoController?.dispose();
     _videoController = null;
     _isVideoReady = false;

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../core/api/api_client.dart';
 import '../core/api/api_endpoints.dart';
@@ -133,23 +132,14 @@ class HomeService {
         requireAuth: true,
       );
 
-      // Log response details
       if (kDebugMode) {
         print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         print('📥 HOME API RESPONSE');
         print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         print('URL: ${ApiEndpoints.home}');
-        try {
-          final prettyJson =
-              const JsonEncoder.withIndent('  ').convert(response);
-          print('Response Body:');
-          print(prettyJson);
-        } catch (e) {
-          print('Response: $response');
-        }
         print('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-        // Log specific data sections
+        // Keep logging lightweight to avoid flooding debug/hot-restart channel.
         if (response['data'] != null) {
           final data = response['data'] as Map<String, dynamic>;
           print('📊 Home Data Summary:');
