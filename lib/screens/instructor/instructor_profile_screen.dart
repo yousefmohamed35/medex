@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:skeletonizer/skeletonizer.dart';
@@ -8,6 +9,7 @@ import '../../core/design/app_radius.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../core/navigation/route_names.dart';
 import '../../widgets/instructor_bottom_nav.dart';
+import '../../widgets/profile_hero_header.dart';
 
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
@@ -26,6 +28,7 @@ class InstructorProfileScreen extends StatefulWidget {
 class _InstructorProfileScreenState extends State<InstructorProfileScreen> {
   bool _isLoading = true;
   Map<String, dynamic>? _profile;
+  Map<String, dynamic>? _statistics;
 
   @override
   void initState() {
@@ -166,12 +169,44 @@ class _InstructorProfileScreenState extends State<InstructorProfileScreen> {
       if (mounted) {
         setState(() {
           _profile = profile;
+          _statistics = profile['statistics'] as Map<String, dynamic>?;
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  String _initials(String? name) {
+    if (name == null || name.trim().isEmpty) return 'ME';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name.length >= 2
+        ? name.substring(0, 2).toUpperCase()
+        : name[0].toUpperCase();
+  }
+
+  String _roleLine() {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    return isAr ? 'مدرب · حساب طبيب' : 'Instructor · Doctor Account';
+  }
+
+  String _memberId() {
+    final raw = _profile?['id']?.toString().replaceAll('-', '') ?? '';
+    if (raw.length >= 5) {
+      return 'MX-2024-${raw.substring(raw.length - 5).toUpperCase()}';
+    }
+    return 'MX-2024-00847';
+  }
+
+  int _statInt(String key, int fallback) {
+    final v = _statistics?[key];
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return fallback;
   }
 
   Future<void> _handleLogout(BuildContext context) async {
@@ -264,8 +299,20 @@ class _InstructorProfileScreenState extends State<InstructorProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final statusBarHeight = MediaQuery.of(context).padding.top;
     final l10n = AppLocalizations.of(context)!;
+    final name = _profile?['name']?.toString() ?? l10n.instructor;
+    final initials = _initials(_isLoading ? null : name);
+    final avatarUrl = _profile?['avatar'] != null
+        ? ApiEndpoints.getImageUrl(_profile!['avatar']?.toString())
+        : null;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+      ),
+    );
 
     return Scaffold(
       backgroundColor: AppColors.beige,
@@ -280,59 +327,73 @@ class _InstructorProfileScreenState extends State<InstructorProfileScreen> {
             ),
             child: Column(
               children: [
-                _buildHeader(statusBarHeight, l10n),
                 Expanded(
-                  child: _isLoading
-                      ? _buildProfileSkeleton()
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.only(
-                            left: 20,
-                            right: 20,
-                            bottom: 140,
-                            top: 24,
-                          ),
-                          child: Column(
-                            children: [
-                              _buildProfileCard(l10n),
-                              const SizedBox(height: 20),
-                              _buildChatCard(l10n),
-                              const SizedBox(height: 20),
-                              _buildMenuTile(
-                                icon: Icons.settings_rounded,
-                                label: l10n.settings,
-                                onTap: () => context.push(RouteNames.settings),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildMenuTile(
-                                icon: Icons.qr_code_scanner_rounded,
-                                label: Localizations.localeOf(context)
-                                            .languageCode ==
-                                        'ar'
-                                    ? 'مسح QR للحضور'
-                                    : 'Scan QR for Attendance',
-                                onTap: () =>
-                                    context.push(RouteNames.instructorScanQr),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildMenuTile(
-                                icon: Icons.event_available_rounded,
-                                label: Localizations.localeOf(context)
-                                            .languageCode ==
-                                        'ar'
-                                    ? 'سجلات الحضور'
-                                    : 'My Attendance',
-                                onTap: () => _showAttendanceSheet(context),
-                              ),
-                              const SizedBox(height: 12),
-                              _buildMenuTile(
-                                icon: Icons.logout_rounded,
-                                label: l10n.logout,
-                                color: Colors.red,
-                                onTap: () => _handleLogout(context),
-                              ),
-                            ],
-                          ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.only(bottom: 140),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ProfileHeroHeader(
+                          name: name,
+                          roleLine: _roleLine(),
+                          memberIdDisplay: 'ID: ${_memberId()}',
+                          initials: initials,
+                          avatarUrl: avatarUrl,
+                          statCourses: _statInt('enrolled_courses', 12),
+                          statCertificates: _statInt('certificates_earned', 5),
+                          statLearningHours:
+                              _statInt('total_learning_hours', 42),
+                          statOrders: _statInt('orders_count', 47),
+                          goldMemberLabel:
+                              isAr ? 'عضو ذهبي' : 'Gold Member',
+                          discountLabel: isAr ? 'خصم 15%' : '15% OFF',
+                          isLoading: _isLoading,
                         ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 44, 20, 0),
+                          child: _isLoading
+                              ? _buildProfileSkeleton()
+                              : Column(
+                                  children: [
+                                    _buildChatCard(l10n),
+                                    const SizedBox(height: 20),
+                                    _buildMenuTile(
+                                      icon: Icons.settings_rounded,
+                                      label: l10n.settings,
+                                      onTap: () =>
+                                          context.push(RouteNames.settings),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildMenuTile(
+                                      icon: Icons.qr_code_scanner_rounded,
+                                      label: isAr
+                                          ? 'مسح QR للحضور'
+                                          : 'Scan QR for Attendance',
+                                      onTap: () => context
+                                          .push(RouteNames.instructorScanQr),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildMenuTile(
+                                      icon: Icons.event_available_rounded,
+                                      label: isAr
+                                          ? 'سجلات الحضور'
+                                          : 'My Attendance',
+                                      onTap: () =>
+                                          _showAttendanceSheet(context),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    _buildMenuTile(
+                                      icon: Icons.logout_rounded,
+                                      label: l10n.logout,
+                                      color: Colors.red,
+                                      onTap: () => _handleLogout(context),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -355,52 +416,6 @@ class _InstructorProfileScreenState extends State<InstructorProfileScreen> {
         ),
         child: Column(
           children: [
-            // Profile card skeleton
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          height: 20,
-                          width: 150,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          height: 14,
-                          width: 180,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
             // Menu tiles skeleton
             ...List.generate(2, (index) {
               return Padding(
@@ -438,101 +453,6 @@ class _InstructorProfileScreenState extends State<InstructorProfileScreen> {
             }),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(double statusBarHeight, AppLocalizations l10n) {
-    return Container(
-      padding: EdgeInsets.only(
-        top: statusBarHeight + 16,
-        left: 20,
-        right: 20,
-        bottom: 24,
-      ),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFD42535), Color(0xFFB01E2D)],
-        ),
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(AppRadius.largeCard),
-          bottomRight: Radius.circular(AppRadius.largeCard),
-        ),
-      ),
-      child: Row(
-        children: [
-          Text(
-            l10n.myAccount,
-            style: GoogleFonts.cairo(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileCard(AppLocalizations l10n) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundColor: AppColors.purple.withOpacity(0.2),
-            backgroundImage: _profile?['avatar'] != null
-                ? NetworkImage(
-                    ApiEndpoints.getImageUrl(
-                      _profile!['avatar']?.toString(),
-                    ),
-                  )
-                : null,
-            child: _profile?['avatar'] == null
-                ? Icon(Icons.person_rounded, size: 40, color: AppColors.purple)
-                : null,
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _profile?['name']?.toString() ?? l10n.instructor,
-                  style: GoogleFonts.cairo(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.foreground,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _profile?['email']?.toString() ?? '',
-                  style: GoogleFonts.cairo(
-                    fontSize: 14,
-                    color: AppColors.mutedForeground,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

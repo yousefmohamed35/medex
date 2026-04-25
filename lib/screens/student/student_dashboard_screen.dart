@@ -8,6 +8,7 @@ import '../../core/design/app_colors.dart';
 import '../../core/navigation/route_names.dart';
 import '../../core/api/api_endpoints.dart';
 import '../../widgets/bottom_nav.dart';
+import '../../widgets/profile_hero_header.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../../l10n/app_localizations.dart';
@@ -327,7 +328,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                     : CustomScrollView(
                         slivers: [
-                          SliverToBoxAdapter(child: _buildHeroHeader(context, name)),
+                          SliverToBoxAdapter(
+                            child: _buildHeroHeader(context, name),
+                          ),
                           SliverPadding(
                             padding: const EdgeInsets.fromLTRB(16, 44, 16, 0),
                             sliver: SliverList(
@@ -502,6 +505,14 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
                                     ),
                                     const _TileDivider(),
                                     _menuTile(
+                                      icon: Icons.settings_outlined,
+                                      iconBg: const Color(0xFFF2F4F7),
+                                      iconColor: const Color(0xFF344054),
+                                      title: l10n.settings,
+                                      onTap: () => context.push(RouteNames.settings),
+                                    ),
+                                    const _TileDivider(),
+                                    _menuTile(
                                       icon: Icons.logout_rounded,
                                       iconBg: const Color(0xFFFFE4E6),
                                       iconColor: AppColors.primary,
@@ -545,194 +556,21 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
     final avatarUrl = _profile?['avatar'] != null
         ? ApiEndpoints.getImageUrl(_profile!['avatar']?.toString())
         : null;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Container(
-          width: double.infinity,
-          color: AppColors.primary,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 56),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      const SizedBox(width: 4),
-                      const Spacer(),
-                      IconButton(
-                        onPressed: () => context.push(RouteNames.settings),
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.2),
-                          foregroundColor: Colors.white,
-                        ),
-                        icon: const Icon(Icons.settings_outlined, size: 22),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    width: 96,
-                    height: 96,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: avatarUrl != null && avatarUrl.isNotEmpty
-                        ? Image.network(
-                            avatarUrl,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Center(
-                              child: Text(
-                                initials,
-                                style: GoogleFonts.cairo(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: Text(
-                              initials,
-                              style: GoogleFonts.cairo(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    name,
-                    style: GoogleFonts.cairo(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _roleLine(),
-                    style: GoogleFonts.cairo(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.workspace_premium_rounded, color: Color(0xFFFFD700), size: 20),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Gold Member',
-                          style: GoogleFonts.cairo(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFD84D),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '15% OFF',
-                            style: GoogleFonts.cairo(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'ID: ${_memberId()}',
-                    style: GoogleFonts.cairo(
-                      color: Colors.white.withValues(alpha: 0.85),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 12,
-          right: 12,
-          bottom: -36,
-          child: Row(
-            children: [
-              Expanded(child: _statCard('${_statInt('enrolled_courses', 12)}', 'Courses')),
-              const SizedBox(width: 8),
-              Expanded(child: _statCard('${_statInt('certificates_earned', 5)}', 'Certificates')),
-              const SizedBox(width: 8),
-              Expanded(child: _statCard('${_statInt('total_learning_hours', 42)}h', 'Learning')),
-              const SizedBox(width: 8),
-              Expanded(child: _statCard('${_statInt('orders_count', 47)}', 'Orders')),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _statCard(String value, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: GoogleFonts.cairo(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: GoogleFonts.cairo(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: const Color(0xFF667085),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+    return ProfileHeroHeader(
+      name: name,
+      roleLine: _roleLine(),
+      memberIdDisplay: 'ID: ${_memberId()}',
+      initials: initials,
+      avatarUrl: avatarUrl,
+      statCourses: _statInt('enrolled_courses', 12),
+      statCertificates: _statInt('certificates_earned', 5),
+      statLearningHours: _statInt('total_learning_hours', 42),
+      statOrders: _statInt('orders_count', 47),
+      goldMemberLabel: isAr ? 'عضو ذهبي' : 'Gold Member',
+      discountLabel: isAr ? 'خصم 15%' : '15% OFF',
+      isLoading: false,
     );
   }
 
