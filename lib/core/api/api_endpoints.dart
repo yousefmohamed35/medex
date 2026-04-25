@@ -245,6 +245,14 @@ class ApiEndpoints {
   static String clinicalCaseEvents(String caseId) =>
       '$baseUrl/clinical-cases/$caseId/events';
 
+  // Events
+  static String get events => '$baseUrl/events';
+  static String event(String eventId) => '$baseUrl/events/$eventId';
+  static String eventRegistrations(String eventId) =>
+      '$baseUrl/events/$eventId/registrations';
+  static String eventCalendar(String eventId) => '$baseUrl/events/$eventId/calendar';
+  static String get eventsHero => '$baseUrl/events/hero';
+
   // Store
   static String get storeCategories => '$baseUrl/store/categories';
   static String get storeProducts => '$baseUrl/store/products';

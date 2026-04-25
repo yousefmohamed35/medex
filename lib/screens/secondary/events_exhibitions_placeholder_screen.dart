@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/design/app_colors.dart';
 import '../../core/navigation/route_names.dart';
+import '../../services/events_service.dart';
 import 'event_details_screen.dart';
 
 class EventsExhibitionsPlaceholderScreen extends StatefulWidget {
@@ -16,6 +17,39 @@ class EventsExhibitionsPlaceholderScreen extends StatefulWidget {
 class _EventsExhibitionsPlaceholderScreenState
     extends State<EventsExhibitionsPlaceholderScreen> {
   bool _showUpcoming = true;
+  bool _isLoading = true;
+  String? _error;
+  List<Map<String, dynamic>> _events = [];
+  Map<String, dynamic>? _hero;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEvents();
+  }
+
+  Future<void> _loadEvents() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final list = await EventsService.instance.getEvents(
+        status: _showUpcoming ? 'upcoming' : 'past',
+      );
+      if (!mounted) return;
+      setState(() {
+        _events = list;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
 
   void _handleBack() {
     if (Navigator.of(context).canPop()) {
@@ -35,10 +69,29 @@ class _EventsExhibitionsPlaceholderScreenState
           _buildHero(),
           _buildTabs(),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-              children: _showUpcoming ? _buildUpcomingCards(context) : _buildPastCards(context),
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _events.isEmpty
+                    ? Center(
+                        child: Text(
+                          _error == null
+                              ? 'No events found'
+                              : _error!.replaceFirst('Exception: ', ''),
+                          style: GoogleFonts.cairo(
+                            fontSize: 13,
+                            color: const Color(0xFF667085),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadEvents,
+                        color: AppColors.primary,
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                          children: _buildCardsFromApi(context),
+                        ),
+                      ),
           ),
         ],
       ),
@@ -99,7 +152,7 @@ class _EventsExhibitionsPlaceholderScreenState
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              '🗓 Upcoming 2025',
+              _pickLocalized('badge', fallback: 'Upcoming 2026'),
               style: GoogleFonts.cairo(
                 color: Colors.white,
                 fontSize: 12,
@@ -109,7 +162,7 @@ class _EventsExhibitionsPlaceholderScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'Where Knowledge\nMeets Practice',
+            _pickLocalized('title', fallback: 'Where Knowledge\nMeets Practice'),
             style: GoogleFonts.cairo(
               color: Colors.white,
               fontSize: 35 / 1.6,
@@ -119,7 +172,7 @@ class _EventsExhibitionsPlaceholderScreenState
           ),
           const SizedBox(height: 6),
           Text(
-            '📍 Cairo · Alexandria · Online',
+            _pickLocalized('subtitle', fallback: 'Cairo · Alexandria · Online'),
             style: GoogleFonts.cairo(
               color: Colors.white.withValues(alpha: 0.92),
               fontSize: 13,
@@ -134,7 +187,7 @@ class _EventsExhibitionsPlaceholderScreenState
               color: Colors.white.withValues(alpha: 0.1),
             ),
             child: Text(
-              'Browse Events →',
+              '${_pickLocalized('cta', fallback: 'Browse Events')} →',
               style: GoogleFonts.cairo(
                 color: Colors.white,
                 fontSize: 20 / 1.6,
@@ -183,81 +236,123 @@ class _EventsExhibitionsPlaceholderScreenState
       ),
       child: Row(
         children: [
-          tab('Upcoming', _showUpcoming, () => setState(() => _showUpcoming = true)),
-          tab('Past Events', !_showUpcoming, () => setState(() => _showUpcoming = false)),
+          tab('Upcoming', _showUpcoming, () {
+            if (_showUpcoming) return;
+            setState(() => _showUpcoming = true);
+            _loadEvents();
+          }),
+          tab('Past Events', !_showUpcoming, () {
+            if (!_showUpcoming) return;
+            setState(() => _showUpcoming = false);
+            _loadEvents();
+          }),
         ],
       ),
     );
   }
 
-  List<Widget> _buildUpcomingCards(BuildContext context) {
-    void go(EventDetailArgs args) {
-      context.push(RouteNames.eventDetails, extra: args);
-    }
-
-    return [
-      _EventCard(
-        day: '22',
-        month: 'MAY',
-        title: 'Cairo International Implant Symposium',
-        placeTime: '📍 Marriott Cairo · 9:00 AM – 6:00 PM · 8 CPD',
-        tagA: 'Straumann Sponsored',
-        tagB: '120 seats left',
-        headerA: const Color(0xFFFF243A),
-        headerB: const Color(0xFFFF5760),
-        calendar: true,
-        onRegister: () => go(EventDetailArgs.cairoSymposium()),
-      ),
-      _EventCard(
-        day: '08',
-        month: 'JUN',
-        title: 'Live Surgery Workshop – Immediate Loading',
-        placeTime: '📍 Medex Training Center · 5 CPD',
-        tagA: 'Limited 20 seats',
-        headerA: const Color(0xFF4B0D17),
-        headerB: const Color(0xFFCC001B),
-        onRegister: () => go(EventDetailArgs.liveSurgery()),
-      ),
-      _EventCard(
-        day: '15',
-        month: 'JUL',
-        title: 'Prosthetic Planning Masterclass',
-        placeTime: '📍 Alexandria Hub · 7 CPD',
-        tagA: 'Early bird open',
-        headerA: const Color(0xFF103E75),
-        headerB: const Color(0xFF1E6E9E),
-        onRegister: () => go(EventDetailArgs.prostheticMasterclass()),
-      ),
-    ];
+  List<Widget> _buildCardsFromApi(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    return _events.map((item) {
+      final eventId = item['id']?.toString() ?? '';
+      final title = EventsService.pickLocalized(item, 'title', isAr,
+          fallback: 'Event');
+      final month = isAr
+          ? (item['month_ar']?.toString() ?? item['month_en']?.toString() ?? '')
+          : (item['month_en']?.toString() ?? item['month']?.toString() ?? '');
+      final day = item['day']?.toString() ?? '--';
+      final location = EventsService.pickLocalized(item, 'location', isAr);
+      final timeText = EventsService.pickLocalized(item, 'time_text', isAr);
+      final cpd = item['cpd_hours']?.toString() ?? '';
+      final placeTime = [
+        if (location.isNotEmpty) '📍 $location',
+        if (timeText.isNotEmpty) timeText,
+        if (cpd.isNotEmpty) '$cpd CPD',
+      ].join(' · ');
+      final tagA = EventsService.pickLocalized(item, 'tag_a', isAr);
+      final tagB = EventsService.pickLocalized(item, 'tag_b', isAr);
+      final headerA = _parseHexColor(
+          item['header_gradient_a']?.toString(), const Color(0xFFFF243A));
+      final headerB = _parseHexColor(
+          item['header_gradient_b']?.toString(), const Color(0xFFFF5760));
+      final showCalendar = item['show_add_to_calendar'] == true;
+      return _EventCard(
+        day: day,
+        month: month,
+        title: title,
+        placeTime: placeTime,
+        tagA: tagA.isEmpty ? (isAr ? 'فعالية' : 'Event') : tagA,
+        tagB: tagB.isEmpty ? null : tagB,
+        headerA: headerA,
+        headerB: headerB,
+        calendar: showCalendar,
+        onRegister: () => _openDetails(eventId, item, isAr),
+        onCalendar: showCalendar ? () => _addToCalendar(eventId) : null,
+      );
+    }).toList();
   }
 
-  List<Widget> _buildPastCards(BuildContext context) {
-    void go(EventDetailArgs args) {
-      context.push(RouteNames.eventDetails, extra: args);
-    }
+  void _openDetails(String eventId, Map<String, dynamic> item, bool isAr) {
+    if (eventId.isEmpty) return;
+    final args = EventDetailArgs(
+      id: eventId,
+      day: item['day']?.toString() ?? '',
+      monthYear: isAr
+          ? (item['month_ar']?.toString() ?? item['month_en']?.toString() ?? '')
+          : (item['month_en']?.toString() ?? item['month']?.toString() ?? ''),
+      title: EventsService.pickLocalized(item, 'title', isAr, fallback: 'Event'),
+      location: EventsService.pickLocalized(item, 'location', isAr),
+      timeRange: EventsService.pickLocalized(item, 'time_text', isAr),
+      cpdHours: item['cpd_hours'] != null ? '${item['cpd_hours']} CPD Hours' : '',
+      attendees: item['attendees_expected'] != null
+          ? '${item['attendees_expected']}+ Attendees Expected'
+          : '',
+      aboutBody: '',
+      expectations: const [],
+      showAddToCalendar: item['show_add_to_calendar'] == true,
+      registrationOpen: item['registration_open'] != false,
+    );
+    context.push(RouteNames.eventDetails, extra: args);
+  }
 
-    return [
-      _EventCard(
-        day: '12',
-        month: 'MAR',
-        title: 'Digital Workflow Essentials',
-        placeTime: '📍 Online Event · Completed',
-        tagA: 'Replay available',
-        headerA: const Color(0xFF455467),
-        headerB: const Color(0xFF6B7A8D),
-        onRegister: () => go(EventDetailArgs.digitalWorkflow()),
-      ),
-      _EventCard(
-        day: '04',
-        month: 'FEB',
-        title: 'Bone Grafting Protocol Update',
-        placeTime: '📍 Cairo Branch · Completed',
-        tagA: 'Certificate issued',
-        headerA: const Color(0xFF4E4954),
-        headerB: const Color(0xFF776D7D),
-        onRegister: () => go(EventDetailArgs.boneGrafting()),
-      ),
-    ];
+  Future<void> _addToCalendar(String eventId) async {
+    if (eventId.isEmpty) return;
+    try {
+      final result = await EventsService.instance.addToCalendar(eventId);
+      if (!mounted) return;
+      final link =
+          result['calendar_url']?.toString() ?? result['ics_url']?.toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            link != null && link.isNotEmpty
+                ? 'Calendar link created'
+                : 'Added to calendar',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
+
+  Color _parseHexColor(String? raw, Color fallback) {
+    final value = raw?.trim() ?? '';
+    if (value.isEmpty) return fallback;
+    var hex = value.replaceFirst('#', '');
+    if (hex.length == 6) hex = 'FF$hex';
+    final intColor = int.tryParse(hex, radix: 16);
+    if (intColor == null) return fallback;
+    return Color(intColor);
+  }
+
+  String _pickLocalized(String baseKey, {required String fallback}) {
+    if (_hero == null) return fallback;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    return EventsService.pickLocalized(_hero!, baseKey, isAr, fallback: fallback);
   }
 }
 
@@ -272,6 +367,7 @@ class _EventCard extends StatelessWidget {
   final Color headerB;
   final bool calendar;
   final VoidCallback onRegister;
+  final VoidCallback? onCalendar;
 
   const _EventCard({
     required this.day,
@@ -282,6 +378,7 @@ class _EventCard extends StatelessWidget {
     required this.headerA,
     required this.headerB,
     required this.onRegister,
+    this.onCalendar,
     this.tagB,
     this.calendar = false,
   });
@@ -390,11 +487,7 @@ class _EventCard extends StatelessWidget {
                       Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          onTap: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Added to calendar — coming soon')),
-                            );
-                          },
+                          onTap: onCalendar,
                           borderRadius: BorderRadius.circular(11),
                           child: Ink(
                             width: 112,

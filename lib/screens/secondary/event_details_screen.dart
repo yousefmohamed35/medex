@@ -3,10 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/design/app_colors.dart';
 import '../../core/navigation/route_names.dart';
+import '../../services/events_service.dart';
 
 /// Passed via `context.push(RouteNames.eventDetails, extra: args)`.
 class EventDetailArgs {
   const EventDetailArgs({
+    required this.id,
     required this.day,
     required this.monthYear,
     required this.title,
@@ -16,8 +18,11 @@ class EventDetailArgs {
     required this.attendees,
     required this.aboutBody,
     required this.expectations,
+    this.showAddToCalendar = true,
+    this.registrationOpen = true,
   });
 
+  final String id;
   final String day;
   final String monthYear;
   final String title;
@@ -27,104 +32,71 @@ class EventDetailArgs {
   final String attendees;
   final String aboutBody;
   final List<String> expectations;
-
-  static EventDetailArgs cairoSymposium() => const EventDetailArgs(
-        day: '22',
-        monthYear: 'MAY 2025',
-        title: 'Cairo International Implant Symposium',
-        location: 'Marriott Hotel Cairo, Egypt',
-        timeRange: '9:00 AM – 6:00 PM',
-        cpdHours: '8 CPD Hours',
-        attendees: '500+ Attendees Expected',
-        aboutBody:
-            'The Cairo International Implant Symposium brings together leading implantologists, prosthodontists, and dental educators for a full day of case presentations, live surgeries, and hands-on workshops.',
-        expectations: [
-          '6 keynote speakers from 4 countries',
-          'Live implant surgery demonstrations',
-          'Hands-on workshop stations',
-          'Industry exhibition floor',
-          'Certificate of attendance',
-        ],
-      );
-
-  static EventDetailArgs liveSurgery() => const EventDetailArgs(
-        day: '08',
-        monthYear: 'JUN 2025',
-        title: 'Live Surgery Workshop – Immediate Loading',
-        location: 'Medex Training Center, Cairo',
-        timeRange: '10:00 AM – 4:00 PM',
-        cpdHours: '5 CPD Hours',
-        attendees: '20 Seats · Limited',
-        aboutBody:
-            'An intensive hands-on workshop focused on immediate loading protocols, case selection, and prosthetic steps with live demonstrations.',
-        expectations: [
-          'Live surgery observation',
-          'Q&A with surgical team',
-          'Printed protocol booklet',
-          'CPD certificate',
-        ],
-      );
-
-  static EventDetailArgs prostheticMasterclass() => const EventDetailArgs(
-        day: '15',
-        monthYear: 'JUL 2025',
-        title: 'Prosthetic Planning Masterclass',
-        location: 'Alexandria Hub, Egypt',
-        timeRange: '9:00 AM – 5:00 PM',
-        cpdHours: '7 CPD Hours',
-        attendees: '150+ Attendees Expected',
-        aboutBody:
-            'Deep dive into digital and analog prosthetic planning for complex implant cases with expert-led sessions.',
-        expectations: [
-          'Digital workflow demos',
-          'Case planning breakout',
-          'Materials exhibition',
-          'Networking lunch',
-          'Certificate of attendance',
-        ],
-      );
-
-  static EventDetailArgs digitalWorkflow() => const EventDetailArgs(
-        day: '12',
-        monthYear: 'MAR 2025',
-        title: 'Digital Workflow Essentials',
-        location: 'Online Event',
-        timeRange: 'Recorded sessions',
-        cpdHours: '4 CPD Hours',
-        attendees: '1,200+ Registered',
-        aboutBody:
-            'On-demand sessions covering scanning, design, and manufacturing workflows for the modern dental practice.',
-        expectations: [
-          'Lifetime replay access',
-          'Downloadable resources',
-          'CPD certificate',
-        ],
-      );
-
-  static EventDetailArgs boneGrafting() => const EventDetailArgs(
-        day: '04',
-        monthYear: 'FEB 2025',
-        title: 'Bone Grafting Protocol Update',
-        location: 'Cairo Branch, Egypt',
-        timeRange: 'Full day',
-        cpdHours: '6 CPD Hours',
-        attendees: 'Completed',
-        aboutBody:
-            'Review of contemporary bone grafting materials and surgical protocols with case discussions.',
-        expectations: [
-          'Expert panel',
-          'Case reviews',
-          'Certificate issued',
-        ],
-      );
+  final bool showAddToCalendar;
+  final bool registrationOpen;
 }
 
-class EventDetailsScreen extends StatelessWidget {
+class EventDetailsScreen extends StatefulWidget {
   const EventDetailsScreen({super.key, this.args});
 
   final EventDetailArgs? args;
 
-  EventDetailArgs get _data => args ?? EventDetailArgs.cairoSymposium();
+  @override
+  State<EventDetailsScreen> createState() => _EventDetailsScreenState();
+}
+
+class _EventDetailsScreenState extends State<EventDetailsScreen> {
+  bool _loading = true;
+  bool _submittingRegistration = false;
+  bool _submittingCalendar = false;
+  String? _error;
+  Map<String, dynamic>? _detailRaw;
+
+  EventDetailArgs get _seed => widget.args ??
+      const EventDetailArgs(
+        id: '',
+        day: '',
+        monthYear: '',
+        title: 'Event Details',
+        location: '',
+        timeRange: '',
+        cpdHours: '',
+        attendees: '',
+        aboutBody: '',
+        expectations: <String>[],
+      );
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDetails();
+  }
+
+  Future<void> _loadDetails() async {
+    final id = _seed.id.trim();
+    if (id.isEmpty) {
+      setState(() => _loading = false);
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final details = await EventsService.instance.getEventDetail(id);
+      if (!mounted) return;
+      setState(() {
+        _detailRaw = details;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
 
   void _handleBack(BuildContext context) {
     if (Navigator.of(context).canPop()) {
@@ -136,14 +108,16 @@ class EventDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final d = _data;
+    final d = _resolvedData(context);
     return Scaffold(
       backgroundColor: const Color(0xFFF0F1F5),
       body: Column(
         children: [
           _AppBar(onBack: () => _handleBack(context)),
           Expanded(
-            child: Stack(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : Stack(
               children: [
                 SingleChildScrollView(
                   padding: const EdgeInsets.only(bottom: 88),
@@ -252,6 +226,18 @@ class EventDetailsScreen extends StatelessWidget {
                                 ),
                               ),
                             ),
+                            if (_error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Text(
+                                  _error!.replaceFirst('Exception: ', ''),
+                                  style: GoogleFonts.cairo(
+                                    fontSize: 12,
+                                    color: const Color(0xFFB42318),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -262,7 +248,14 @@ class EventDetailsScreen extends StatelessWidget {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: _BottomActions(),
+                  child: _BottomActions(
+                    showCalendar: d.showAddToCalendar,
+                    registrationEnabled:
+                        d.registrationOpen && !_submittingRegistration,
+                    calendarEnabled: !_submittingCalendar,
+                    onRegister: _register,
+                    onCalendar: _addToCalendar,
+                  ),
                 ),
               ],
             ),
@@ -270,6 +263,83 @@ class EventDetailsScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  EventDetailArgs _resolvedData(BuildContext context) {
+    final raw = _detailRaw;
+    if (raw == null) return _seed;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final expectationsRaw = (isAr ? raw['expectations_ar'] : raw['expectations_en']) ??
+        raw['expectations'];
+    final expectations = expectationsRaw is List
+        ? expectationsRaw.map((e) => e.toString()).where((e) => e.trim().isNotEmpty).toList()
+        : _seed.expectations;
+    return EventDetailArgs(
+      id: raw['id']?.toString() ?? _seed.id,
+      day: raw['day']?.toString() ?? _seed.day,
+      monthYear: isAr
+          ? (raw['month_year_ar']?.toString() ??
+              raw['month_year_en']?.toString() ??
+              _seed.monthYear)
+          : (raw['month_year_en']?.toString() ??
+              raw['month_year']?.toString() ??
+              _seed.monthYear),
+      title: EventsService.pickLocalized(raw, 'title', isAr, fallback: _seed.title),
+      location: EventsService.pickLocalized(raw, 'location', isAr,
+          fallback: _seed.location),
+      timeRange: EventsService.pickLocalized(raw, 'time_range', isAr,
+          fallback: _seed.timeRange),
+      cpdHours: EventsService.pickLocalized(raw, 'cpd_hours_text', isAr,
+          fallback: _seed.cpdHours),
+      attendees: EventsService.pickLocalized(raw, 'attendees_text', isAr,
+          fallback: _seed.attendees),
+      aboutBody: EventsService.pickLocalized(raw, 'about_body', isAr,
+          fallback: _seed.aboutBody),
+      expectations: expectations,
+      showAddToCalendar: raw['show_add_to_calendar'] != false,
+      registrationOpen: raw['registration_open'] != false,
+    );
+  }
+
+  Future<void> _register() async {
+    final id = _resolvedData(context).id.trim();
+    if (id.isEmpty) return;
+    setState(() => _submittingRegistration = true);
+    try {
+      await EventsService.instance.registerForEvent(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registration completed')),
+      );
+      await _loadDetails();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _submittingRegistration = false);
+    }
+  }
+
+  Future<void> _addToCalendar() async {
+    final id = _resolvedData(context).id.trim();
+    if (id.isEmpty) return;
+    setState(() => _submittingCalendar = true);
+    try {
+      await EventsService.instance.addToCalendar(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Calendar link created')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    } finally {
+      if (mounted) setState(() => _submittingCalendar = false);
+    }
   }
 }
 
@@ -421,6 +491,20 @@ class _DetailRow extends StatelessWidget {
 }
 
 class _BottomActions extends StatelessWidget {
+  const _BottomActions({
+    required this.showCalendar,
+    required this.registrationEnabled,
+    required this.calendarEnabled,
+    required this.onRegister,
+    required this.onCalendar,
+  });
+
+  final bool showCalendar;
+  final bool registrationEnabled;
+  final bool calendarEnabled;
+  final VoidCallback onRegister;
+  final VoidCallback onCalendar;
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -444,11 +528,7 @@ class _BottomActions extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Registration — coming soon')),
-                      );
-                    },
+                    onPressed: registrationEnabled ? onRegister : null,
                     child: Text(
                       'Register Now →',
                       style: GoogleFonts.cairo(
@@ -459,35 +539,33 @@ class _BottomActions extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 7,
-                child: SizedBox(
-                  height: 48,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      side: const BorderSide(color: AppColors.primary, width: 1.5),
-                      backgroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+              if (showCalendar) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 7,
+                  child: SizedBox(
+                    height: 48,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary, width: 1.5),
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                    ),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Calendar — coming soon')),
-                      );
-                    },
-                    child: Text(
-                      '+ Calendar',
-                      style: GoogleFonts.cairo(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 15,
+                      onPressed: calendarEnabled ? onCalendar : null,
+                      child: Text(
+                        '+ Calendar',
+                        style: GoogleFonts.cairo(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
