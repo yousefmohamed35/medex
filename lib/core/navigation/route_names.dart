@@ -44,6 +44,7 @@ class RouteNames {
   static const String settings = '/settings';
   static const String allCourses = '/all-courses';
   static const String medexAcademy = '/medex-academy';
+  static const String academyCourseDetails = '/academy-course-details';
   static const String medexOffers = '/medex-offers';
 
   /// [offerId] examples: `bb-implant`, `powerbone`, `macros`

@@ -1,7 +1,11 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/design/app_colors.dart';
 import '../../services/community_service.dart';
+import '../../services/upload_service.dart';
 
 class CreatePostScreen extends StatefulWidget {
   const CreatePostScreen({super.key});
@@ -15,6 +19,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _focusNode = FocusNode();
   bool _isPosting = false;
   String _selectedVisibility = 'public';
+  File? _selectedImage;
+  File? _selectedVideo;
 
   @override
   void initState() {
@@ -32,12 +38,29 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
   Future<void> _publishPost() async {
     final content = _contentController.text.trim();
-    if (content.isEmpty) return;
+    if (content.isEmpty && _selectedImage == null && _selectedVideo == null) {
+      return;
+    }
 
     setState(() => _isPosting = true);
 
     try {
-      await CommunityService.instance.createPost(content: content);
+      final media = <String>[];
+      if (_selectedImage != null) {
+        final imageUrl =
+            await UploadService.instance.uploadImage(_selectedImage!);
+        media.add(imageUrl);
+      }
+      if (_selectedVideo != null) {
+        final videoUrl =
+            await UploadService.instance.uploadVideo(_selectedVideo!);
+        media.add(videoUrl);
+      }
+
+      await CommunityService.instance.createPost(
+        content: content,
+        media: media,
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -70,6 +93,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   Widget build(BuildContext context) {
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final hasContent = _contentController.text.trim().isNotEmpty;
+    final canPost =
+        hasContent || _selectedImage != null || _selectedVideo != null;
 
     return Directionality(
       textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
@@ -97,7 +122,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 child: ElevatedButton(
-                  onPressed: hasContent && !_isPosting ? _publishPost : null,
+                  onPressed: canPost && !_isPosting ? _publishPost : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     disabledBackgroundColor: Colors.grey[300],
@@ -202,6 +227,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
+                    if (_selectedImage != null || _selectedVideo != null) ...[
+                      const SizedBox(height: 16),
+                      _buildSelectedMedia(isAr),
+                    ],
                   ],
                 ),
               ),
@@ -286,24 +315,95 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
           _ToolbarItem(
               icon: Icons.image_rounded,
               label: isAr ? 'صورة' : 'Photo',
-              color: Colors.green),
+              color: Colors.green,
+              onTap: _pickImage),
           _ToolbarItem(
               icon: Icons.videocam_rounded,
               label: isAr ? 'فيديو' : 'Video',
-              color: AppColors.primary),
+              color: AppColors.primary,
+              onTap: _pickVideo),
           _ToolbarItem(
-              icon: Icons.gif_box_rounded, label: 'GIF', color: Colors.purple),
+              icon: Icons.gif_box_rounded,
+              label: 'GIF',
+              color: Colors.purple,
+              onTap: () {}),
           _ToolbarItem(
               icon: Icons.location_on_rounded,
               label: isAr ? 'موقع' : 'Location',
-              color: Colors.orange),
+              color: Colors.orange,
+              onTap: () {}),
           _ToolbarItem(
               icon: Icons.person_add_rounded,
               label: isAr ? 'إشارة' : 'Tag',
-              color: Colors.blue),
+              color: Colors.blue,
+              onTap: () {}),
         ],
       ),
     );
+  }
+
+  Widget _buildSelectedMedia(bool isAr) {
+    return Column(
+      children: [
+        if (_selectedImage != null)
+          _MediaAttachmentTile(
+            icon: Icons.image_rounded,
+            title: isAr ? 'تم اختيار صورة' : 'Image selected',
+            subtitle: _selectedImage!.path.split(Platform.pathSeparator).last,
+            onRemove: () => setState(() => _selectedImage = null),
+          ),
+        if (_selectedVideo != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: _MediaAttachmentTile(
+              icon: Icons.videocam_rounded,
+              title: isAr ? 'تم اختيار فيديو' : 'Video selected',
+              subtitle: _selectedVideo!.path.split(Platform.pathSeparator).last,
+              onRemove: () => setState(() => _selectedVideo = null),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      if (result == null || result.files.single.path == null) return;
+      setState(() => _selectedImage = File(result.files.single.path!));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Failed to select image: $e', style: GoogleFonts.cairo()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.video,
+        allowMultiple: false,
+      );
+      if (result == null || result.files.single.path == null) return;
+      setState(() => _selectedVideo = File(result.files.single.path!));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content:
+              Text('Failed to select video: $e', style: GoogleFonts.cairo()),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 
@@ -385,23 +485,84 @@ class _ToolbarItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
+  final VoidCallback onTap;
 
   const _ToolbarItem(
-      {required this.icon, required this.label, required this.color});
+      {required this.icon,
+      required this.label,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 24, color: color),
-        const SizedBox(height: 2),
-        Text(label,
-            style: GoogleFonts.cairo(
-                fontSize: 10,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w600)),
-      ],
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 24, color: color),
+          const SizedBox(height: 2),
+          Text(label,
+              style: GoogleFonts.cairo(
+                  fontSize: 10,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MediaAttachmentTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onRemove;
+
+  const _MediaAttachmentTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: GoogleFonts.cairo(
+                        fontSize: 13, fontWeight: FontWeight.w700)),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      GoogleFonts.cairo(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onRemove,
+            icon: const Icon(Icons.close_rounded),
+            tooltip: 'Remove',
+          ),
+        ],
+      ),
     );
   }
 }

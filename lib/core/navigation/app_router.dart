@@ -31,6 +31,7 @@ import '../../screens/secondary/enrolled_screen.dart';
 import '../../screens/secondary/settings_screen.dart';
 import '../../screens/secondary/all_courses_screen.dart';
 import '../../screens/secondary/medex_academy_placeholder_screen.dart';
+import '../../screens/secondary/academy_course_details_screen.dart';
 import '../../screens/secondary/medex_offers_placeholder_screen.dart';
 import '../../screens/secondary/medex_offer_detail_screen.dart';
 import '../../screens/secondary/clinical_cases_placeholder_screen.dart';
@@ -60,7 +61,6 @@ import '../../screens/store/orders_screen.dart';
 import '../../screens/store/category_products_screen.dart';
 import '../../screens/store/product_categories_screen.dart';
 import '../../screens/community/community_screen.dart';
-import '../../screens/community/implant_community_screen.dart';
 import '../../screens/community/post_detail_screen.dart';
 import '../../screens/community/create_post_screen.dart';
 import '../../models/product.dart';
@@ -202,6 +202,15 @@ class AppRouter {
         pageBuilder: (context, state) => _buildPageWithTransition(
           key: state.pageKey,
           child: const MedexAcademyPlaceholderScreen(),
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.academyCourseDetails,
+        pageBuilder: (context, state) => _buildPageWithTransition(
+          key: state.pageKey,
+          child: AcademyCourseDetailsScreen(
+            course: state.extra as Map<String, dynamic>?,
+          ),
         ),
       ),
       GoRoute(
@@ -388,7 +397,7 @@ class AppRouter {
         path: RouteNames.implantCommunity,
         pageBuilder: (context, state) => _buildPageWithTransition(
           key: state.pageKey,
-          child: const ImplantCommunityScreen(),
+          child: const CommunityScreen(),
         ),
       ),
       GoRoute(

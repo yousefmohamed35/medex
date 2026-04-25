@@ -57,6 +57,10 @@ class CommunityService extends ChangeNotifier {
         uri.toString(),
         requireAuth: true,
       );
+      _logResponse('GET', uri.toString(), response);
+      if (kDebugMode) {
+        log('fetchPosts full response: $response', name: _logName);
+      }
       if (response['success'] == true && response['data'] != null) {
         final data = response['data'];
         List<dynamic> list = [];
@@ -188,6 +192,38 @@ class CommunityService extends ChangeNotifier {
     throw Exception(response['message'] ?? 'Failed to add comment');
   }
 
+  Future<CommunityPost?> fetchPostDetails(String postId) async {
+    try {
+      final url = ApiEndpoints.communityPost(postId);
+      _logRequest('GET', url);
+      final response = await ApiClient.instance.get(
+        url,
+        requireAuth: true,
+      );
+      _logResponse('GET', url, response);
+      if (kDebugMode) {
+        log('fetchPostDetails full response: $response', name: _logName);
+      }
+      if (response['success'] == true && response['data'] != null) {
+        final parsed = _parsePost(response['data']);
+        final index = _posts.indexWhere((p) => p.id == parsed.id);
+        if (index >= 0) {
+          _posts[index] = parsed;
+        } else {
+          _posts.insert(0, parsed);
+        }
+        notifyListeners();
+        return parsed;
+      }
+      throw Exception(response['message'] ?? 'Failed to load post details');
+    } catch (e) {
+      if (kDebugMode) {
+        log('fetchPostDetails failed: $e', name: _logName);
+      }
+      return null;
+    }
+  }
+
   Future<void> toggleCommentLike(String postId, String commentId) async {
     final postIndex = _posts.indexWhere((p) => p.id == postId);
     if (postIndex < 0) return;
@@ -205,6 +241,9 @@ class CommunityService extends ChangeNotifier {
         requireAuth: true,
       );
       _logResponse('POST', url, response);
+      if (kDebugMode) {
+        log('toggleCommentLike full response: $response', name: _logName);
+      }
       if (response['success'] == true) {
         comment.isLiked = !comment.isLiked;
         comment.likesCount += comment.isLiked ? 1 : -1;
@@ -237,18 +276,47 @@ class CommunityService extends ChangeNotifier {
     final map = raw is Map<String, dynamic>
         ? raw
         : Map<String, dynamic>.from(raw as Map);
+    final originalPost = map['originalPost'] is Map
+        ? Map<String, dynamic>.from(map['originalPost'] as Map)
+        : <String, dynamic>{};
+    final source = originalPost.isNotEmpty ? originalPost : map;
     final author = map['author'] is Map
         ? Map<String, dynamic>.from(map['author'] as Map)
         : <String, dynamic>{};
-    final media = map['media'] is List ? map['media'] as List : const [];
+    final media = source['media'] is List ? source['media'] as List : const [];
     String? imageUrl;
-    if (media.isNotEmpty && media.first is Map) {
-      imageUrl = ApiEndpoints.getImageUrl(
-          (media.first as Map)['url']?.toString() ?? '');
+    String? videoUrl;
+    if (media.isNotEmpty) {
+      for (final item in media) {
+        if (item is! Map) continue;
+        final mediaMap = item;
+        final url = ApiEndpoints.getImageUrl(mediaMap['url']?.toString() ?? '');
+        if (url.isEmpty) continue;
+        final type = (mediaMap['type']?.toString() ?? '').toLowerCase();
+        if (type == 'video' && videoUrl == null) {
+          videoUrl = url;
+        } else if (imageUrl == null) {
+          imageUrl = url;
+        }
+      }
     } else {
-      imageUrl = ApiEndpoints.getImageUrl(map['image']?.toString() ?? '');
+      imageUrl = ApiEndpoints.getImageUrl(source['image']?.toString() ?? '');
     }
-    final commentsRaw = map['comments'] is List ? map['comments'] as List : [];
+    final commentsRaw =
+        source['comments'] is List ? source['comments'] as List : const [];
+    final content = (source['content'] ?? map['content'] ?? '').toString();
+    final likesCount = _asInt(source['likesCount'] ?? source['likes_count']);
+    final commentsCount =
+        _asInt(source['commentsCount'] ?? source['comments_count']);
+    final sharesCount = _asInt(
+      source['shareCount'] ?? source['sharesCount'] ?? source['shares_count'],
+    );
+    final viewerReaction = (source['viewer_reaction'] ??
+            source['viewerReaction'] ??
+            (source['isLiked'] == true ? 'like' : ''))
+        .toString();
+    final isLiked = source['isLiked'] == true || viewerReaction.isNotEmpty;
+
     return CommunityPost(
       id: map['id']?.toString() ?? '',
       authorId: author['id']?.toString() ?? '',
@@ -256,16 +324,22 @@ class CommunityService extends ChangeNotifier {
       authorAvatar:
           ApiEndpoints.getImageUrl(author['avatar']?.toString() ?? ''),
       authorTitle: author['title']?.toString() ?? '',
-      content: map['content']?.toString() ?? '',
+      content: content,
       imageUrl: imageUrl,
-      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ??
-          DateTime.now(),
-      likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
-      commentsCount: (map['comments_count'] as num?)?.toInt() ?? 0,
-      sharesCount: (map['shares_count'] as num?)?.toInt() ?? 0,
-      isLiked: (map['viewer_reaction']?.toString().isNotEmpty ?? false),
+      videoUrl: videoUrl,
+      createdAt: _parseDate(
+        source['created_at'] ??
+            source['createdAt'] ??
+            source['published_at'] ??
+            map['createdAt'] ??
+            map['created_at'],
+      ),
+      likesCount: likesCount,
+      commentsCount: commentsCount,
+      sharesCount: sharesCount,
+      isLiked: isLiked,
       comments: commentsRaw.map((e) => _parseComment(e)).toList(),
-      reaction: map['viewer_reaction']?.toString() ?? '',
+      reaction: viewerReaction,
     );
   }
 
@@ -283,10 +357,46 @@ class CommunityService extends ChangeNotifier {
       authorAvatar:
           ApiEndpoints.getImageUrl(author['avatar']?.toString() ?? ''),
       content: map['content']?.toString() ?? '',
-      createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ??
-          DateTime.now(),
-      likesCount: (map['likes_count'] as num?)?.toInt() ?? 0,
-      isLiked: (map['viewer_reaction']?.toString().isNotEmpty ?? false),
+      createdAt: _parseDate(map['created_at'] ?? map['createdAt']),
+      likesCount: _asInt(map['likesCount'] ?? map['likes_count']),
+      isLiked: map['isLiked'] == true ||
+          (map['viewer_reaction']?.toString().isNotEmpty ?? false),
     );
+  }
+
+  DateTime _parseDate(dynamic value) {
+    if (value == null) return DateTime.now();
+
+    if (value is int) {
+      // Supports both seconds and milliseconds timestamps.
+      return value > 1000000000000
+          ? DateTime.fromMillisecondsSinceEpoch(value)
+          : DateTime.fromMillisecondsSinceEpoch(value * 1000);
+    }
+    if (value is double) {
+      final ms = value.toInt();
+      return ms > 1000000000000
+          ? DateTime.fromMillisecondsSinceEpoch(ms)
+          : DateTime.fromMillisecondsSinceEpoch(ms * 1000);
+    }
+
+    final raw = value.toString().trim();
+    if (raw.isEmpty) return DateTime.now();
+
+    final asInt = int.tryParse(raw);
+    if (asInt != null) {
+      return asInt > 1000000000000
+          ? DateTime.fromMillisecondsSinceEpoch(asInt)
+          : DateTime.fromMillisecondsSinceEpoch(asInt * 1000);
+    }
+
+    return DateTime.tryParse(raw)?.toLocal() ?? DateTime.now();
+  }
+
+  int _asInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString()) ?? 0;
   }
 }

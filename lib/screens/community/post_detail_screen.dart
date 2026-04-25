@@ -17,12 +17,14 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   final _commentController = TextEditingController();
   final _focusNode = FocusNode();
   late CommunityPost _post;
+  bool _isLoadingDetails = false;
 
   @override
   void initState() {
     super.initState();
     _post = widget.post ?? _communityService.posts.first;
     _communityService.addListener(_onUpdate);
+    _loadPostDetails();
   }
 
   @override
@@ -38,6 +40,16 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       final idx = _communityService.posts.indexWhere((p) => p.id == _post.id);
       if (idx >= 0) setState(() => _post = _communityService.posts[idx]);
     }
+  }
+
+  Future<void> _loadPostDetails() async {
+    setState(() => _isLoadingDetails = true);
+    final detailed = await _communityService.fetchPostDetails(_post.id);
+    if (!mounted) return;
+    if (detailed != null) {
+      setState(() => _post = detailed);
+    }
+    setState(() => _isLoadingDetails = false);
   }
 
   Future<void> _submitComment() async {
@@ -78,6 +90,117 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (diff.inHours < 24) return 'منذ ${diff.inHours} س';
     if (diff.inDays < 7) return 'منذ ${diff.inDays} يوم';
     return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
+  }
+
+  Widget _buildAvatar({
+    required String name,
+    required String avatarUrl,
+    required double radius,
+    Color? fallbackBackground,
+  }) {
+    final hasAvatar = avatarUrl.trim().isNotEmpty;
+    if (hasAvatar) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: fallbackBackground ?? Colors.grey.shade200,
+        backgroundImage: NetworkImage(avatarUrl),
+      );
+    }
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: fallbackBackground ?? Colors.grey.shade200,
+      child: Text(
+        name.isNotEmpty ? name[0] : '?',
+        style: GoogleFonts.cairo(
+          fontSize: radius * 0.8,
+          fontWeight: FontWeight.bold,
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPostMedia(bool isAr) {
+    if (_post.videoUrl != null && _post.videoUrl!.isNotEmpty) {
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        width: double.infinity,
+        height: 220,
+        decoration: BoxDecoration(
+          color: Colors.black87,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.play_circle_fill_rounded,
+                size: 56, color: Colors.white),
+            const SizedBox(height: 8),
+            Text(
+              isAr ? 'تم إرفاق فيديو' : 'Video attached',
+              style: GoogleFonts.cairo(
+                fontSize: 14,
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_post.imageUrl != null && _post.imageUrl!.isNotEmpty) {
+      final imageUrl = _post.imageUrl!;
+      final fallbackUrl = _alternateMediaUrl(imageUrl);
+      return Container(
+        margin: const EdgeInsets.only(top: 12),
+        width: double.infinity,
+        height: 220,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) {
+            if (fallbackUrl != null && fallbackUrl != imageUrl) {
+              return Image.network(
+                fallbackUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: Colors.grey[200],
+                  child: Icon(Icons.image_not_supported_outlined,
+                      size: 48, color: Colors.grey[400]),
+                ),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+              );
+            }
+            return Container(
+              color: Colors.grey[200],
+              child: Icon(Icons.image_not_supported_outlined,
+                  size: 48, color: Colors.grey[400]),
+            );
+          },
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return const Center(child: CircularProgressIndicator());
+          },
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  String? _alternateMediaUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.contains('/api/uploads/')) {
+      return url.replaceFirst('/api/uploads/', '/uploads/');
+    }
+    if (url.contains('/uploads/')) {
+      return url.replaceFirst('/uploads/', '/api/uploads/');
+    }
+    return null;
   }
 
   @override
@@ -138,24 +261,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         children: [
           Row(
             children: [
-              CircleAvatar(
+              _buildAvatar(
+                name: _post.authorName,
+                avatarUrl: _post.authorAvatar,
                 radius: 24,
-                backgroundColor: _post.authorId == 'u6'
+                fallbackBackground: _post.authorId == 'u6'
                     ? AppColors.primary.withOpacity(0.1)
                     : Colors.grey.shade200,
-                child: _post.authorId == 'u6'
-                    ? Image.asset('assets/images/medex_logo.png',
-                        width: 28,
-                        height: 28,
-                        errorBuilder: (_, __, ___) => const Icon(Icons.business,
-                            color: AppColors.primary, size: 24))
-                    : Text(
-                        _post.authorName.isNotEmpty ? _post.authorName[0] : '?',
-                        style: GoogleFonts.cairo(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary),
-                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -203,6 +315,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             style: GoogleFonts.cairo(
                 fontSize: 15, height: 1.7, color: AppColors.foreground),
           ),
+          _buildPostMedia(isAr),
         ],
       ),
     );
@@ -290,6 +403,24 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Widget _buildCommentsSection(bool isAr) {
     final comments = _post.comments;
 
+    if (_isLoadingDetails && comments.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(24),
+        child: Center(
+          child: Column(
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 12),
+              Text(
+                isAr ? 'جاري تحميل التعليقات...' : 'Loading comments...',
+                style: GoogleFonts.cairo(fontSize: 14, color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     if (comments.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(32),
@@ -339,18 +470,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
+          _buildAvatar(
+            name: comment.authorName,
+            avatarUrl: comment.authorAvatar,
             radius: 18,
-            backgroundColor: comment.authorId == 'current_user'
+            fallbackBackground: comment.authorId == 'current_user'
                 ? AppColors.primary.withOpacity(0.15)
                 : Colors.grey.shade200,
-            child: Text(
-              comment.authorName.isNotEmpty ? comment.authorName[0] : '?',
-              style: GoogleFonts.cairo(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary),
-            ),
           ),
           const SizedBox(width: 10),
           Expanded(

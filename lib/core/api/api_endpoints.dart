@@ -115,6 +115,23 @@ class ApiEndpoints {
   // Search
   static String get search => '$baseUrl/search';
 
+  // Academy
+  static String get academyCategories => '$baseUrl/academy/categories';
+  static String get academyCourses => '$baseUrl/academy/courses';
+  static String academyCourse(String courseId) =>
+      '$baseUrl/academy/courses/$courseId';
+  static String academyEnrollCourse(String courseId) =>
+      '$baseUrl/academy/courses/$courseId/enroll';
+  static String academyCourseCurriculum(String courseId) =>
+      '$baseUrl/academy/courses/$courseId/curriculum';
+  static String academyLesson(String lessonId) =>
+      '$baseUrl/academy/lessons/$lessonId';
+  static String academyLessonProgress(String lessonId) =>
+      '$baseUrl/academy/lessons/$lessonId/progress';
+  static String academyLessonComplete(String lessonId) =>
+      '$baseUrl/academy/lessons/$lessonId/complete';
+  static String get academySearch => '$baseUrl/academy/search';
+
   // Upload (API_DOCUMENTATION - POST multipart, returns url)
   static String get upload => '$baseUrl/upload';
 
