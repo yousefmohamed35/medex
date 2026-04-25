@@ -220,6 +220,14 @@ class ApiEndpoints {
   static String communityReportComment(String commentId) =>
       '$baseUrl/community/comments/$commentId/report';
 
+  // Clinical Cases
+  static String get clinicalCases => '$baseUrl/clinical-cases';
+  static String clinicalCase(String caseId) => '$baseUrl/clinical-cases/$caseId';
+  static String clinicalCaseRatings(String caseId) =>
+      '$baseUrl/clinical-cases/$caseId/ratings';
+  static String clinicalCaseEvents(String caseId) =>
+      '$baseUrl/clinical-cases/$caseId/events';
+
   // Store
   static String get storeCategories => '$baseUrl/store/categories';
   static String get storeProducts => '$baseUrl/store/products';

@@ -6,6 +6,7 @@ import '../../core/navigation/route_names.dart';
 import '../../data/sample_products.dart';
 import '../../models/product.dart';
 import '../../services/cart_service.dart';
+import '../../services/store_service.dart';
 import '../../widgets/bottom_nav.dart';
 
 class StoreScreen extends StatefulWidget {
@@ -17,23 +18,124 @@ class StoreScreen extends StatefulWidget {
 
 class _StoreScreenState extends State<StoreScreen> {
   final _searchController = TextEditingController();
-  final bool _isLoading = false;
+  bool _isLoading = true;
+  String? _apiError;
+  List<Product> _apiProducts = [];
   String _searchQuery = '';
   int _selectedRailIndex = 0;
 
   @override
   void initState() {
     super.initState();
+    _loadStoreData();
+  }
+
+  Future<void> _loadStoreData() async {
+    setState(() {
+      _isLoading = true;
+      _apiError = null;
+    });
+    try {
+      final results = await Future.wait([
+        StoreService.instance.getCategories(),
+        StoreService.instance.getProducts(perPage: 20),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        // Keep categories request active for backend verification/logging,
+        // even though the UI now derives visible categories from product data.
+        final _ = results[0] as List<ProductCategory>;
+        _apiProducts = results[1] as List<Product>;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _apiError = e.toString();
+        _isLoading = false;
+      });
+    }
   }
 
   _StoreSectionData get _activeSection => _storeSections[_selectedRailIndex];
 
+  List<Product> get _railProducts {
+    if (_apiProducts.isEmpty) return const [];
+    return _apiProducts.where((p) {
+      if (p.brand.trim().isEmpty) return true;
+      return _matchesSelectedRailBrand(p.brand);
+    }).toList();
+  }
+
+  bool _matchesSelectedRailBrand(String rawBrand) {
+    final brand = rawBrand.toLowerCase().trim();
+    switch (_selectedRailIndex) {
+      case 0:
+        return brand.contains('b&b') || brand.contains('bb');
+      case 1:
+        return brand.contains('macros');
+      case 2:
+        return brand.contains('powerbone');
+      case 3:
+        return brand.contains('mctbio');
+      case 4:
+        return brand.contains('biomaterial') ||
+            brand.contains('graft') ||
+            brand.contains('regenerative');
+      default:
+        return true;
+    }
+  }
+
   List<_StoreFeaturedProduct> get _activeFeaturedProducts {
-    // Always show featured picks for the active brand.
+    if (_railProducts.isNotEmpty) {
+      final q = _searchQuery.trim().toLowerCase();
+      final filtered = q.isEmpty
+          ? _railProducts
+          : _railProducts
+              .where((p) =>
+                  p.name.toLowerCase().contains(q) ||
+                  p.nameAr.toLowerCase().contains(q))
+              .toList();
+      return filtered
+          .take(6)
+          .map(
+            (p) => _StoreFeaturedProduct(
+              productId: p.id,
+              name: p.name,
+              price: p.price.toStringAsFixed(0),
+              inStock: p.isAvailable,
+            ),
+          )
+          .toList();
+    }
+    // Fallback featured picks for current hardcoded brand section.
     return _activeSection.featuredProducts;
   }
 
   List<_StoreCategoryCardData> get _visibleCategories {
+    if (_railProducts.isNotEmpty) {
+      final map = <String, int>{};
+      for (final p in _railProducts) {
+        final key = p.category.trim().isEmpty ? 'General' : p.category.trim();
+        map[key] = (map[key] ?? 0) + 1;
+      }
+      final q = _searchQuery.trim().toLowerCase();
+      final mapped = map.entries
+          .map(
+            (e) => _StoreCategoryCardData(
+              title: e.key,
+              itemsCount: e.value,
+              icon: Icons.category_outlined,
+            ),
+          )
+          .toList()
+        ..sort((a, b) => a.title.compareTo(b.title));
+      if (q.isEmpty) return mapped;
+      return mapped
+          .where((c) => c.title.toLowerCase().replaceAll('\n', ' ').contains(q))
+          .toList();
+    }
     final list = _activeSection.categories;
     final q = _searchQuery.trim().toLowerCase();
     if (q.isEmpty) return list;
@@ -47,21 +149,22 @@ class _StoreScreenState extends State<StoreScreen> {
       title.replaceAll('\n', ' ').trim();
 
   void _openCategoryListing(String categoryTitle) {
-    final cat = _normalizeCategoryTitle(categoryTitle);
+    final cat = Uri.encodeComponent(_normalizeCategoryTitle(categoryTitle));
     context.push(
-      '${RouteNames.storeCategoryListing}?brand=$_selectedRailIndex&cat=${Uri.encodeComponent(cat)}',
+      '${RouteNames.storeCategoryListing}?brand=$_selectedRailIndex&cat=$cat',
     );
   }
 
   void _openDefaultCategoryListing() {
-    final section = _activeSection;
-    final first = section.categories.isNotEmpty
-        ? section.categories.first.title
-        : 'Implant Systems';
-    _openCategoryListing(first);
+    context.push(
+      '${RouteNames.storeCategoryListing}?brand=$_selectedRailIndex&all=1',
+    );
   }
 
   Product? _productById(String id) {
+    for (final p in _apiProducts) {
+      if (p.id == id) return p;
+    }
     for (final p in SampleProducts.products) {
       if (p.id == id) return p;
     }
@@ -87,11 +190,15 @@ class _StoreScreenState extends State<StoreScreen> {
               Expanded(
                 child: _isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : Row(
-                        children: [
-                          _buildLeftRail(isAr),
-                          Expanded(child: _buildRightPanel(isAr)),
-                        ],
+                    : RefreshIndicator(
+                        onRefresh: _loadStoreData,
+                        color: AppColors.primary,
+                        child: Row(
+                          children: [
+                            _buildLeftRail(isAr),
+                            Expanded(child: _buildRightPanel(isAr)),
+                          ],
+                        ),
                       ),
               ),
             ],
@@ -228,7 +335,9 @@ class _StoreScreenState extends State<StoreScreen> {
           final item = items[index];
           final isActive = _selectedRailIndex == index;
           return GestureDetector(
-            onTap: () => setState(() => _selectedRailIndex = index),
+            onTap: () => setState(() {
+              _selectedRailIndex = index;
+            }),
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
@@ -279,11 +388,11 @@ class _StoreScreenState extends State<StoreScreen> {
   }
 
   String _toArLabel(String label) {
-    if (label == 'B&B Dental') return 'بي آند بي';
-    if (label.toLowerCase().contains('implant')) return 'زرعات';
-    if (label.toLowerCase().contains('digital')) return 'رقمي';
-    if (label.toLowerCase().contains('surgical')) return 'جراحي';
-    if (label.toLowerCase().contains('bio')) return 'مواد حيوية';
+    if (label == 'B&B') return 'بي آند بي';
+    if (label.toLowerCase().contains('macros')) return 'ماكروز';
+    if (label.toLowerCase().contains('powerbone')) return 'باوربون';
+    if (label.toLowerCase().contains('mctbio')) return 'إم سي تي بايو';
+    if (label.toLowerCase().contains('biomaterials')) return 'المواد الحيوية/التجديد';
     return label;
   }
 
@@ -298,6 +407,26 @@ class _StoreScreenState extends State<StoreScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (_apiError != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEBEE),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFFCDD2)),
+                ),
+                child: Text(
+                  _apiError!.replaceFirst('Exception: ', ''),
+                  style: GoogleFonts.cairo(
+                    fontSize: 11.5,
+                    color: const Color(0xFFB71C1C),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             Material(
               color: Colors.transparent,
               child: InkWell(
@@ -320,14 +449,14 @@ class _StoreScreenState extends State<StoreScreen> {
                             Text(
                               section.title,
                               style: GoogleFonts.cairo(
-                                fontSize: 13.5,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                             Text(
-                              '${section.country} · ${section.totalProducts} Products',
+                                '${section.country} · ${_railProducts.isNotEmpty ? _railProducts.length : section.totalProducts} Products · ${categories.length} Categories',
                               style: GoogleFonts.cairo(
-                                fontSize: 11,
+                                fontSize: 11.5,
                                 color: const Color(0xFF7D8391),
                               ),
                             ),
@@ -335,10 +464,10 @@ class _StoreScreenState extends State<StoreScreen> {
                         ),
                       ),
                       Text(
-                        isAr ? 'كل التصنيفات >' : 'All Categories >',
+                        isAr ? 'كل المنتجات >' : 'All Products >',
                         style: GoogleFonts.cairo(
                           color: AppColors.primary,
-                          fontSize: 12.5,
+                          fontSize: 13,
                           fontWeight: FontWeight.w800,
                         ),
                       )
@@ -354,7 +483,7 @@ class _StoreScreenState extends State<StoreScreen> {
                 color: const Color(0xFF485064),
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
-                fontSize: 14,
+                fontSize: 13.5,
               ),
             ),
             const SizedBox(height: 8),
@@ -401,7 +530,7 @@ class _StoreScreenState extends State<StoreScreen> {
                           Text(
                             c.title,
                             style: GoogleFonts.cairo(
-                              fontSize: 12.5,
+                              fontSize: 12,
                               fontWeight: FontWeight.w800,
                             ),
                             maxLines: 2,
@@ -409,9 +538,11 @@ class _StoreScreenState extends State<StoreScreen> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            '${c.itemsCount} Items',
+                            isAr
+                                ? '${c.itemsCount} منتج'
+                                : '${c.itemsCount} Items',
                             style: GoogleFonts.cairo(
-                              fontSize: 10.8,
+                              fontSize: 11,
                               color: const Color(0xFF98A0AE),
                             ),
                           ),
@@ -422,6 +553,28 @@ class _StoreScreenState extends State<StoreScreen> {
                 );
               },
             ),
+            if (categories.isEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFDADDE5)),
+                ),
+                child: Text(
+                  isAr
+                      ? 'لا توجد تصنيفات متاحة لهذا القسم حالياً.'
+                      : 'No categories available for this section yet.',
+                  style: GoogleFonts.cairo(
+                    fontSize: 12,
+                    color: const Color(0xFF667085),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
             const SizedBox(height: 12),
             Text(
               isAr ? '| المنتجات المميزة' : '| FEATURED PRODUCTS',
@@ -429,11 +582,33 @@ class _StoreScreenState extends State<StoreScreen> {
                 color: const Color(0xFF485064),
                 fontWeight: FontWeight.w800,
                 letterSpacing: 0.5,
-                fontSize: 14,
+                fontSize: 13.5,
               ),
             ),
             const SizedBox(height: 8),
             ...featured.map((p) => _buildFeaturedTile(p, isAr)),
+            if (featured.isEmpty)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(top: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFDADDE5)),
+                ),
+                child: Text(
+                  isAr
+                      ? 'لا توجد منتجات مطابقة حالياً. جرّب اختيار "كل المنتجات".'
+                      : 'No matching products right now. Try selecting "All Products".',
+                  style: GoogleFonts.cairo(
+                    fontSize: 12,
+                    color: const Color(0xFF667085),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -481,7 +656,7 @@ class _StoreScreenState extends State<StoreScreen> {
                       Text(
                         f.name,
                         style: GoogleFonts.cairo(
-                          fontSize: 13.5,
+                          fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
                         maxLines: 2,
@@ -492,7 +667,7 @@ class _StoreScreenState extends State<StoreScreen> {
                             ? (isAr ? 'متوفر' : 'In Stock')
                             : (isAr ? 'غير متوفر' : 'Out of Stock'),
                         style: GoogleFonts.cairo(
-                          fontSize: 10.8,
+                          fontSize: 11,
                           color: f.inStock
                               ? const Color(0xFF17A34A)
                               : const Color(0xFF9CA3AF),
@@ -502,7 +677,7 @@ class _StoreScreenState extends State<StoreScreen> {
                       Text(
                         'EGP ${f.price}',
                         style: GoogleFonts.cairo(
-                          fontSize: 14.5,
+                          fontSize: 15,
                           color: AppColors.primary,
                           fontWeight: FontWeight.w900,
                         ),
@@ -632,7 +807,7 @@ class _StoreScreenState extends State<StoreScreen> {
 
 const List<_StoreSectionData> _storeSections = [
   _StoreSectionData(
-    title: 'B&B Dental',
+    title: 'B&B',
     country: 'Italy',
     totalProducts: 12,
     railIcon: Icons.widgets_outlined,
@@ -673,7 +848,7 @@ const List<_StoreSectionData> _storeSections = [
     ],
   ),
   _StoreSectionData(
-    title: 'Macros Implants',
+    title: 'Macros',
     country: 'Germany',
     totalProducts: 8,
     railIcon: Icons.event_outlined,
@@ -734,7 +909,7 @@ const List<_StoreSectionData> _storeSections = [
     ],
   ),
   _StoreSectionData(
-    title: 'MCTBIO Implant',
+    title: 'MCTBIO',
     country: 'South Korea',
     totalProducts: 10,
     railIcon: Icons.adjust_rounded,
@@ -758,7 +933,7 @@ const List<_StoreSectionData> _storeSections = [
     ],
   ),
   _StoreSectionData(
-    title: 'Biomaterials',
+    title: 'Biomaterials/Regenerative',
     country: 'Multi-brand',
     totalProducts: 14,
     railIcon: Icons.sync_outlined,

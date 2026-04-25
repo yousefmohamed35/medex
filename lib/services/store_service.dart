@@ -56,7 +56,10 @@ class StoreService {
     final url = Uri.parse(ApiEndpoints.storeProducts)
         .replace(queryParameters: query)
         .toString();
-    final response = await ApiClient.instance.get(url, requireAuth: true);
+    final response = await ApiClient.instance.get(
+      url,
+      requireAuth: true,
+    );
 
     if (response['success'] != true) {
       throw Exception(response['message'] ?? 'Failed to fetch products');
@@ -118,7 +121,10 @@ class StoreService {
       'page': '$page',
       'per_page': '$perPage',
     }).toString();
-    final response = await ApiClient.instance.get(url, requireAuth: true);
+    final response = await ApiClient.instance.get(
+      url,
+      requireAuth: true,
+    );
     if (response['success'] != true) {
       throw Exception(response['message'] ?? 'Failed to fetch orders');
     }

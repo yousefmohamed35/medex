@@ -1,11 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/api/api_endpoints.dart';
 import '../../core/design/app_colors.dart';
 import '../../core/navigation/route_names.dart';
+import '../../services/clinical_cases_service.dart';
 
-class ClinicalCasesPlaceholderScreen extends StatelessWidget {
+class ClinicalCasesPlaceholderScreen extends StatefulWidget {
   const ClinicalCasesPlaceholderScreen({super.key});
+
+  @override
+  State<ClinicalCasesPlaceholderScreen> createState() =>
+      _ClinicalCasesPlaceholderScreenState();
+}
+
+class _ClinicalCasesPlaceholderScreenState
+    extends State<ClinicalCasesPlaceholderScreen> {
+  bool _isLoadingCases = true;
+  List<_ClinicalCaseData> _cases = const [];
+  String _searchQuery = '';
+  String _selectedCategoryId = 'all';
 
   void _handleBack(BuildContext context) {
     if (Navigator.of(context).canPop()) {
@@ -16,39 +30,175 @@ class ClinicalCasesPlaceholderScreen extends StatelessWidget {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _loadCases();
+  }
+
+  Future<void> _loadCases() async {
+    setState(() {
+      _isLoadingCases = true;
+    });
+    try {
+      final isAr = Localizations.localeOf(context).languageCode == 'ar';
+      final rawCases = await ClinicalCasesService.instance.getCases(perPage: 20);
+      final mapped = rawCases.map((e) => _mapApiCase(e, isAr)).toList();
+      if (!mounted) return;
+      setState(() {
+        _cases = mapped.isEmpty ? _fallbackCases() : mapped;
+        if (_cases.isNotEmpty && _cases.first.categoryId.isNotEmpty) {
+          _selectedCategoryId = _cases.first.categoryId;
+        } else {
+          _selectedCategoryId = 'all';
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _cases = _fallbackCases();
+        if (_cases.isNotEmpty && _cases.first.categoryId.isNotEmpty) {
+          _selectedCategoryId = _cases.first.categoryId;
+        } else {
+          _selectedCategoryId = 'all';
+        }
+      });
+    } finally {
+      if (mounted) setState(() => _isLoadingCases = false);
+    }
+  }
+
+  List<_ClinicalCaseData> _fallbackCases() => <_ClinicalCaseData>[
+        const _ClinicalCaseData(
+          id: '55099e0f-2670-4af9-9c15-6efe3a1eb13c',
+          categoryId: '8c9aa259-03f2-4e0a-82c4-d9197e3cc5c7',
+          label: 'FULL ARCH · B&B',
+          title: 'All-on-4 Immediate Loading – Complete Rehabilitation',
+          summary:
+              'Patient presented with complete edentulism. Final zirconia bridge at 6 months.',
+          details:
+              'Clinical case from B&B Dental implantology collection.',
+          categoryName: 'Subperiosteal Implants',
+          categoryNameAr: 'زرعات تحت السمحاق',
+          slug: 'bilateral-subperiosteal-customized-implants-on-atrophic-mandible',
+          status: 'active',
+          position: 1,
+          gradientA: Color(0xFF3A0C10),
+          gradientB: Color(0xFF6B040A),
+        ),
+        const _ClinicalCaseData(
+          id: 'e5d94941-4d2b-4412-ba04-fa5efa79897a',
+          categoryId: 'e416f32a-e4a8-4966-925d-50a83fdac908',
+          label: 'SINGLE UNIT · B&B',
+          title: 'Mandibular Molar Replacement with BLX System',
+          summary:
+              'Single unit immediate implant. ISQ 74 at placement. Final crown at 8 weeks.',
+          details:
+              'Clinical case from B&B Dental implantology collection.',
+          categoryName: 'Guided Surgery',
+          categoryNameAr: 'الجراحة الموجهة',
+          slug: 'all-on-6-with-guided-surgery',
+          status: 'active',
+          position: 3,
+          gradientA: Color(0xFF1B3E82),
+          gradientB: Color(0xFF4B3B95),
+        ),
+        const _ClinicalCaseData(
+          id: 'c132e013-247c-45cc-b777-2733e14cfbf2',
+          categoryId: 'e416f32a-e4a8-4966-925d-50a83fdac908',
+          label: 'GBR · REGENERATIVE',
+          title: 'GBR with Collagen Membrane + Delayed Implant',
+          summary:
+              'Horizontal bone augmentation with Powerbone graft. Delayed implant at 6 months.',
+          details:
+              'Clinical case from B&B Dental implantology collection.',
+          categoryName: 'Guided Surgery',
+          categoryNameAr: 'الجراحة الموجهة',
+          slug: '4-implants-guided-surgery-with-extractions-and-immediate-loading',
+          status: 'active',
+          position: 4,
+          gradientA: Color(0xFF4F1B6B),
+          gradientB: Color(0xFFD9072D),
+        ),
+      ];
+
+  _ClinicalCaseData _mapApiCase(Map<String, dynamic> map, bool isAr) {
+    final category = map['category'] is Map
+        ? Map<String, dynamic>.from(map['category'] as Map)
+        : <String, dynamic>{};
+
+    Color parseHex(String? hex, Color fallback) {
+      if (hex == null || hex.trim().isEmpty) return fallback;
+      final clean = hex.trim().replaceAll('#', '');
+      if (clean.length == 6) {
+        final value = int.tryParse('FF$clean', radix: 16);
+        if (value != null) return Color(value);
+      } else if (clean.length == 8) {
+        final value = int.tryParse(clean, radix: 16);
+        if (value != null) return Color(value);
+      }
+      return fallback;
+    }
+
+    return _ClinicalCaseData(
+      id: map['id']?.toString() ?? '',
+      categoryId: map['categoryId']?.toString() ?? category['id']?.toString() ?? '',
+      label: map['label']?.toString() ??
+          '${map['category'] is Map ? ((map['category'] as Map)['name']?.toString() ?? 'CASE') : 'CASE'}',
+      title: ClinicalCasesService.pickLocalized(
+        map,
+        'title',
+        isAr,
+        fallback: 'Clinical Case',
+      ),
+      summary: ClinicalCasesService.pickLocalized(
+        map,
+        'summary',
+        isAr,
+        fallback: map['details']?.toString() ?? '',
+      ),
+      details: ClinicalCasesService.pickLocalized(
+        map,
+        'details',
+        isAr,
+        fallback: '',
+      ),
+      categoryName: category['name']?.toString() ?? '',
+      categoryNameAr: category['nameAr']?.toString() ?? category['name']?.toString() ?? '',
+      slug: map['slug']?.toString() ?? '',
+      status: map['status']?.toString() ?? '',
+      featured: map['featured'] == true,
+      position: ClinicalCasesService.toInt(map['position']),
+      createdAt: map['createdAt']?.toString() ?? '',
+      updatedAt: map['updatedAt']?.toString() ?? '',
+      gradientA: parseHex(
+        map['hero_gradient_a']?.toString(),
+        const Color(0xFF3A0C10),
+      ),
+      gradientB: parseHex(
+        map['hero_gradient_b']?.toString(),
+        const Color(0xFF6B040A),
+      ),
+      thumbnailUrl: ApiEndpoints.getImageUrl(
+        map['thumbnail']?.toString(),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final cases = <_ClinicalCaseData>[
-      const _ClinicalCaseData(
-        label: 'FULL ARCH · B&B',
-        title: 'All-on-4 Immediate Loading – Complete Rehabilitation',
-        summary:
-            'Patient presented with complete edentulism. Final zirconia bridge at 6 months.',
-        doctor: 'Dr. Nour Khalil',
-        location: 'Eg Egypt · Cairo',
-        gradientA: Color(0xFF3A0C10),
-        gradientB: Color(0xFF6B040A),
-      ),
-      const _ClinicalCaseData(
-        label: 'SINGLE UNIT · B&B',
-        title: 'Mandibular Molar Replacement with BLX System',
-        summary:
-            'Single unit immediate implant. ISQ 74 at placement. Final crown at 8 weeks.',
-        doctor: 'Dr. Sami Amin',
-        location: 'Eg Egypt · Alexandria',
-        gradientA: Color(0xFF1B3E82),
-        gradientB: Color(0xFF4B3B95),
-      ),
-      const _ClinicalCaseData(
-        label: 'GBR · REGENERATIVE',
-        title: 'GBR with Collagen Membrane + Delayed Implant',
-        summary:
-            'Horizontal bone augmentation with Powerbone graft. Delayed implant at 6 months.',
-        doctor: 'Dr. Rania Fouad',
-        location: 'Eg Egypt · Giza',
-        gradientA: Color(0xFF4F1B6B),
-        gradientB: Color(0xFFD9072D),
-      ),
-    ];
+    final source = _cases.isEmpty ? _fallbackCases() : _cases;
+    final categoryFiltered = _selectedCategoryId == 'all'
+        ? source
+        : source.where((c) => c.categoryId == _selectedCategoryId).toList();
+    final q = _searchQuery.trim().toLowerCase();
+    final cases = q.isEmpty
+        ? categoryFiltered
+        : categoryFiltered
+            .where((c) =>
+                c.title.toLowerCase().contains(q) ||
+                c.summary.toLowerCase().contains(q) ||
+                c.label.toLowerCase().contains(q))
+            .toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFE9EBF0),
@@ -56,31 +206,45 @@ class ClinicalCasesPlaceholderScreen extends StatelessWidget {
         children: [
           _buildTopBar(context),
           _buildHero(),
-          _buildFilters(),
+          _buildFilters(context),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
-              children: [
-                for (var i = 0; i < cases.length; i++) ...[
-                  // Capture current item per iteration to avoid closure/index issues.
-                  (() {
-                    final caseItem = cases[i];
-                    return _CaseCard(
-                      data: caseItem,
-                      onViewCase: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                ClinicalCaseDetailScreen(data: caseItem),
-                          ),
-                        );
-                      },
-                    );
-                  })(),
-                  if (i != cases.length - 1) const SizedBox(height: 10),
-                ],
-              ],
-            ),
+            child: _isLoadingCases
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 18),
+                    children: [
+                      for (var i = 0; i < cases.length; i++) ...[
+                        (() {
+                          final caseItem = cases[i];
+                          return _CaseCard(
+                            data: caseItem,
+                            onViewCase: () {
+                              final hasUuidLikeId = caseItem.id.contains('-');
+                              if (!hasUuidLikeId) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Invalid case id. Please refresh cases.',
+                                      style: GoogleFonts.cairo(),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                                return;
+                              }
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      ClinicalCaseDetailScreen(data: caseItem),
+                                ),
+                              );
+                            },
+                          );
+                        })(),
+                        if (i != cases.length - 1) const SizedBox(height: 10),
+                      ],
+                    ],
+                  ),
           ),
         ],
       ),
@@ -124,17 +288,50 @@ class ClinicalCasesPlaceholderScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.search_rounded,
-                  color: Colors.white,
-                  size: 18,
+              GestureDetector(
+                onTap: () async {
+                  final ctrl = TextEditingController(text: _searchQuery);
+                  final value = await showDialog<String>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: Text(
+                        'Search Cases',
+                        style: GoogleFonts.cairo(fontWeight: FontWeight.w700),
+                      ),
+                      content: TextField(
+                        controller: ctrl,
+                        autofocus: true,
+                        decoration: const InputDecoration(hintText: 'Type title...'),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () =>
+                              Navigator.of(ctx).pop(ctrl.text.trim()),
+                          child: const Text('Apply'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (value != null && mounted) {
+                    setState(() => _searchQuery = value);
+                  }
+                },
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.search_rounded,
+                    color: Colors.white,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
@@ -197,23 +394,81 @@ class ClinicalCasesPlaceholderScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFilters() {
-    Widget chip(String text, {bool active = false}) => Container(
+  Widget _buildFilters(BuildContext context) {
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final uniqueCategories = <String, _CategoryFilterOption>{};
+    for (final item in _cases) {
+      if (item.categoryId.isEmpty) continue;
+      uniqueCategories[item.categoryId] = _CategoryFilterOption(
+        id: item.categoryId,
+        name: isAr
+            ? (item.categoryNameAr.isNotEmpty ? item.categoryNameAr : item.categoryName)
+            : item.categoryName,
+      );
+    }
+    final categories = uniqueCategories.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+
+    Widget topFilterChip(String text) => Container(
+          height: 32,
           margin: const EdgeInsets.only(right: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           decoration: BoxDecoration(
-            color: active ? AppColors.primary : const Color(0xFFF1F2F5),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: active ? AppColors.primary : const Color(0xFFD6D9E0),
-            ),
+            color: const Color(0xFFECEEF2),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFD9DDE4)),
           ),
-          child: Text(
-            text,
-            style: GoogleFonts.cairo(
-              fontSize: 12.5,
-              color: active ? Colors.white : const Color(0xFF667085),
-              fontWeight: FontWeight.w700,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Flexible(
+                child: Text(
+                  text,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.cairo(
+                    fontSize: 11.5,
+                    color: const Color(0xFF374151),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Icon(
+                Icons.arrow_drop_down_rounded,
+                size: 16,
+                color: Color(0xFF6B7280),
+              ),
+            ],
+          ),
+        );
+
+    Widget categoryChip(
+      String text, {
+      required bool active,
+      required VoidCallback onTap,
+    }) =>
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 34,
+            margin: const EdgeInsets.only(right: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              color: active ? AppColors.primary : const Color(0xFFF7F7F8),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: active ? AppColors.primary : const Color(0xFFD1D5DB),
+              ),
+            ),
+            child: Center(
+              child: Text(
+                text,
+                style: GoogleFonts.cairo(
+                  fontSize: 13,
+                  color: active ? Colors.white : const Color(0xFF374151),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
           ),
         );
@@ -225,22 +480,30 @@ class ClinicalCasesPlaceholderScreen extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(child: chip('All Categories ▾')),
-              Expanded(child: chip('By Year ▾')),
-              Expanded(child: chip('By Doctor ▾')),
-              Expanded(child: chip('By Country ▾')),
+              Expanded(child: topFilterChip('All Categories')),
+              Expanded(child: topFilterChip('By Year')),
+              Expanded(child: topFilterChip('By Doctor')),
+              Expanded(child: topFilterChip('By Country')),
             ],
           ),
           const SizedBox(height: 8),
           SizedBox(
-            height: 42,
+            height: 40,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                chip('B&B Implant', active: true),
-                chip('Point Implant'),
-                chip('Powerbone'),
-                chip('Regenerative'),
+                categoryChip(
+                  isAr ? 'كل التصنيفات' : 'All Categories',
+                  active: _selectedCategoryId == 'all',
+                  onTap: () => setState(() => _selectedCategoryId = 'all'),
+                ),
+                ...categories.map(
+                  (cat) => categoryChip(
+                    cat.name,
+                    active: _selectedCategoryId == cat.id,
+                    onTap: () => setState(() => _selectedCategoryId = cat.id),
+                  ),
+                ),
               ],
             ),
           ),
@@ -281,6 +544,35 @@ class _CaseCard extends StatelessWidget {
             ),
             child: Stack(
               children: [
+                if (data.thumbnailUrl.isNotEmpty)
+                  Positioned.fill(
+                    child: ClipRRect(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(14)),
+                      child: Image.network(
+                        data.thumbnailUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          const BorderRadius.vertical(top: Radius.circular(14)),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.15),
+                          Colors.black.withValues(alpha: 0.35),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
                 Positioned(
                   top: 10,
                   left: 10,
@@ -332,11 +624,13 @@ class _CaseCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    _chip('Full Arch'),
+                    _chip(data.categoryName.isNotEmpty ? data.categoryName : 'Category'),
                     const SizedBox(width: 6),
-                    _chip('12 months'),
-                    const SizedBox(width: 6),
-                    _chip('Excellent'),
+                    _chip(data.status.isNotEmpty ? data.status : 'active'),
+                    if (data.featured) ...[
+                      const SizedBox(width: 6),
+                      _chip('featured'),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -346,10 +640,10 @@ class _CaseCard extends StatelessWidget {
                       radius: 15,
                       backgroundColor: AppColors.primary,
                       child: Text(
-                        data.doctor.split(' ').take(2).map((e) => e[0]).join(),
+                        '#${data.position == 0 ? 1 : data.position}',
                         style: GoogleFonts.cairo(
                           color: Colors.white,
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -360,12 +654,16 @@ class _CaseCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            data.doctor,
+                            data.slug.isNotEmpty ? data.slug : data.id,
                             style: GoogleFonts.cairo(
-                                fontSize: 12.5, fontWeight: FontWeight.w700),
+                                fontSize: 11.5, fontWeight: FontWeight.w700),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            data.location,
+                            data.createdAt.isNotEmpty
+                                ? data.createdAt.replaceFirst('T', ' ').split('.').first
+                                : 'No timestamp',
                             style: GoogleFonts.cairo(
                                 fontSize: 11, color: const Color(0xFF667085)),
                           ),
@@ -439,23 +737,49 @@ class _CaseCard extends StatelessWidget {
 }
 
 class _ClinicalCaseData {
+  final String id;
+  final String categoryId;
   final String label;
   final String title;
   final String summary;
-  final String doctor;
-  final String location;
+  final String details;
+  final String categoryName;
+  final String categoryNameAr;
+  final String slug;
+  final String status;
+  final bool featured;
+  final int position;
+  final String createdAt;
+  final String updatedAt;
   final Color gradientA;
   final Color gradientB;
+  final String thumbnailUrl;
 
   const _ClinicalCaseData({
+    required this.id,
+    this.categoryId = '',
     required this.label,
     required this.title,
     required this.summary,
-    required this.doctor,
-    required this.location,
+    this.details = '',
+    this.categoryName = '',
+    this.categoryNameAr = '',
+    this.slug = '',
+    this.status = '',
+    this.featured = false,
+    this.position = 0,
+    this.createdAt = '',
+    this.updatedAt = '',
     required this.gradientA,
     required this.gradientB,
+    this.thumbnailUrl = '',
   });
+}
+
+class _CategoryFilterOption {
+  final String id;
+  final String name;
+  const _CategoryFilterOption({required this.id, required this.name});
 }
 
 class ClinicalCaseDetailScreen extends StatefulWidget {
@@ -470,6 +794,32 @@ class ClinicalCaseDetailScreen extends StatefulWidget {
 
 class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
   int _selectedRating = 0;
+  bool _isSubmittingRating = false;
+  bool _isLoadingDetail = true;
+  Map<String, dynamic>? _detail;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCaseDetail();
+  }
+
+  Future<void> _loadCaseDetail() async {
+    setState(() {
+      _isLoadingDetail = true;
+    });
+    try {
+      final detail =
+          await ClinicalCasesService.instance.getCaseDetail(widget.data.id);
+      if (!mounted) return;
+      setState(() => _detail = detail);
+    } catch (e) {
+      if (!mounted) return;
+      // Keep fallback UI without exposing raw backend errors.
+    } finally {
+      if (mounted) setState(() => _isLoadingDetail = false);
+    }
+  }
 
   void _openRatingSheet() {
     showModalBottomSheet<void>(
@@ -538,18 +888,42 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _selectedRating == 0
+                      onPressed: _selectedRating == 0 || _isSubmittingRating
                           ? null
-                          : () {
-                              Navigator.of(ctx).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Rating submitted ($_selectedRating/5)',
-                                    style: GoogleFonts.cairo(),
+                          : () async {
+                              setState(() => _isSubmittingRating = true);
+                              try {
+                                await ClinicalCasesService.instance.submitRating(
+                                  caseId: widget.data.id,
+                                  rating: _selectedRating,
+                                );
+                                if (!mounted) return;
+                                Navigator.of(ctx).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Rating submitted ($_selectedRating/5)',
+                                      style: GoogleFonts.cairo(),
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              } catch (e) {
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      e.toString().replaceFirst('Exception: ', ''),
+                                      style: GoogleFonts.cairo(),
+                                    ),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              } finally {
+                                if (mounted) {
+                                  setState(() => _isSubmittingRating = false);
+                                  setSheetState(() {});
+                                }
+                              }
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -558,10 +932,19 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      child: Text(
-                        'Submit Rating',
-                        style: GoogleFonts.cairo(fontWeight: FontWeight.w700),
-                      ),
+                      child: _isSubmittingRating
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              'Submit Rating',
+                              style: GoogleFonts.cairo(fontWeight: FontWeight.w700),
+                            ),
                     ),
                   ),
                   SizedBox(
@@ -592,6 +975,74 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final caseData = widget.data;
+    final isAr = Localizations.localeOf(context).languageCode == 'ar';
+    final detail = _detail ?? <String, dynamic>{};
+    final media = detail['media'] is Map
+        ? Map<String, dynamic>.from(detail['media'] as Map)
+        : <String, dynamic>{};
+    final hero = detail['hero'] is Map
+        ? Map<String, dynamic>.from(detail['hero'] as Map)
+        : <String, dynamic>{};
+
+    final title = ClinicalCasesService.pickLocalized(
+      detail,
+      'title',
+      isAr,
+      fallback: caseData.title,
+    );
+    final summaryText = ClinicalCasesService.pickLocalized(
+      detail,
+      'summary',
+      isAr,
+      fallback: caseData.summary,
+    );
+    final caseSummary = ClinicalCasesService.pickLocalized(
+      detail,
+      'case_summary',
+      isAr,
+      fallback: ClinicalCasesService.pickLocalized(
+        detail,
+        'details',
+        isAr,
+        fallback:
+            'Patient presented with complete edentulism of maxillary arch. After CBCT planning, 4 BLX implants were placed (2 axial + 2 tilted at 30°). Provisional bridge delivered same day at 35 Ncm. Final zirconia bridge placed at 6 months. ISQ values at loading: 72–78.',
+      ),
+    );
+    final categoryMap = detail['category'] is Map
+        ? Map<String, dynamic>.from(detail['category'] as Map)
+        : <String, dynamic>{};
+    final category = isAr
+        ? (categoryMap['nameAr']?.toString() ??
+            categoryMap['name']?.toString() ??
+            caseData.categoryNameAr)
+        : (categoryMap['name']?.toString() ?? caseData.categoryName);
+    final slug = detail['slug']?.toString() ?? caseData.slug;
+    final status = detail['status']?.toString() ?? caseData.status;
+    final featured = detail['featured'] == true || caseData.featured;
+    final position = ClinicalCasesService.toInt(
+      detail['position'],
+      fallback: caseData.position,
+    );
+    final createdAt = detail['createdAt']?.toString() ?? caseData.createdAt;
+    final updatedAt = detail['updatedAt']?.toString() ?? caseData.updatedAt;
+    final videoUrl = media['video_url']?.toString() ?? detail['video_url']?.toString() ?? '';
+    final pdfUrl = media['pdf_url']?.toString() ?? detail['pdf_url']?.toString() ?? '';
+    final images = (media['images'] as List?)?.map((e) => e.toString()).toList() ?? <String>[];
+    final imageCount = images.isNotEmpty
+        ? images.length
+        : ClinicalCasesService.toInt(detail['images_count'], fallback: 14);
+    final gradientA = _parseHexColor(
+      hero['gradient_a']?.toString(),
+      fallback: caseData.gradientA,
+    );
+    final gradientB = _parseHexColor(
+      hero['gradient_b']?.toString(),
+      fallback: caseData.gradientB,
+    );
+    final thumbnailUrl = ApiEndpoints.getImageUrl(
+      detail['thumbnail']?.toString() ?? caseData.thumbnailUrl,
+    );
+
     return Scaffold(
       backgroundColor: const Color(0xFFE5E7EB),
       body: Column(
@@ -653,7 +1104,9 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
+            child: _isLoadingDetail
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -663,16 +1116,31 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
-                        colors: [caseData.gradientA, caseData.gradientB],
+                        colors: [gradientA, gradientB],
                       ),
                     ),
                     child: Stack(
                       children: [
-                        const Center(
-                          child: Icon(
-                            Icons.circle_outlined,
-                            color: Colors.white54,
-                            size: 56,
+                        if (thumbnailUrl.isNotEmpty)
+                          Positioned.fill(
+                            child: Image.network(
+                              thumbnailUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                            ),
+                          ),
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withValues(alpha: 0.15),
+                                  Colors.black.withValues(alpha: 0.45),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                         Positioned(
@@ -680,11 +1148,11 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                           right: 12,
                           child: Row(
                             children: [
-                              _mediaTag('▶ Video'),
+                              _mediaTag('▶ Video', onTap: videoUrl.isEmpty ? null : () {}),
                               const SizedBox(width: 8),
-                              _mediaTag('📄 PDF'),
+                              _mediaTag('📄 PDF', onTap: pdfUrl.isEmpty ? null : () {}),
                               const SizedBox(width: 8),
-                              _mediaTag('▦ 14 imgs'),
+                              _mediaTag('▦ $imageCount imgs', onTap: images.isEmpty ? null : () {}),
                             ],
                           ),
                         ),
@@ -708,7 +1176,7 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                'FULL ARCH',
+                                category,
                                 style: GoogleFonts.cairo(
                                   color: Colors.white,
                                   fontSize: 12,
@@ -716,20 +1184,21 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'B&B Implant',
-                              style: GoogleFonts.cairo(
-                                fontSize: 12,
-                                color: const Color(0xFF6B7280),
-                                fontWeight: FontWeight.w700,
+                            if (featured) const SizedBox(width: 10),
+                            if (featured)
+                              Text(
+                                'Featured',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 12,
+                                  color: const Color(0xFF047857),
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
-                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          caseData.title,
+                          title,
                           style: GoogleFonts.cairo(
                             fontSize: 20,
                             height: 1.2,
@@ -744,7 +1213,7 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                               radius: 20,
                               backgroundColor: AppColors.primary,
                               child: Text(
-                                'NK',
+                                '#$position',
                                 style: GoogleFonts.cairo(
                                   color: Colors.white,
                                   fontWeight: FontWeight.w800,
@@ -757,14 +1226,16 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    caseData.doctor,
+                                    slug.isNotEmpty ? slug : caseData.id,
                                     style: GoogleFonts.cairo(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w800,
                                     ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    'Periodontist · Cairo University · EG Egypt',
+                                    status.isNotEmpty ? status : 'active',
                                     style: GoogleFonts.cairo(
                                       fontSize: 10,
                                       color: const Color(0xFF6B7280),
@@ -776,57 +1247,59 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                           ],
                         ),
                         const SizedBox(height: 12),
-                        const Row(
+                        Row(
                           children: [
                             Expanded(
                               child: _MetaBlock(
-                                label: 'AGE / GENDER',
-                                value: '54 · Female',
+                                label: 'CREATED AT',
+                                value: createdAt.isNotEmpty
+                                    ? createdAt
+                                        .replaceFirst('T', ' ')
+                                        .split('.')
+                                        .first
+                                    : '-',
                               ),
                             ),
                             Expanded(
                               child: _MetaBlock(
-                                label: 'FOLLOW-UP',
-                                value: '12 months',
+                                label: 'UPDATED AT',
+                                value: updatedAt.isNotEmpty
+                                    ? updatedAt
+                                        .replaceFirst('T', ' ')
+                                        .split('.')
+                                        .first
+                                    : '-',
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 10),
-                        const Row(
+                        Row(
                           children: [
                             Expanded(
                               child: _MetaBlock(
-                                label: 'IMPLANT SYSTEM',
-                                value: 'B&B BLX 4.5mm',
+                                label: 'CATEGORY',
+                                value: category,
                               ),
                             ),
                             Expanded(
                               child: _MetaBlock(
-                                label: 'LOADING',
-                                value: 'Immediate',
+                                label: 'CASE ID',
+                                value: caseData.id.length > 12
+                                    ? '${caseData.id.substring(0, 8)}...'
+                                    : caseData.id,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
-                        const Row(
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
-                            Expanded(
-                              child: _BeforeAfterCard(
-                                title: 'BEFORE',
-                                background: Color(0xFFF3F4F6),
-                                emoji: '😬',
-                              ),
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: _BeforeAfterCard(
-                                title: 'AFTER',
-                                background: Color(0xFFF1E4E4),
-                                emoji: '😁',
-                              ),
-                            ),
+                            _statusChip(status.isEmpty ? 'active' : status),
+                            if (featured) _statusChip('featured'),
+                            _statusChip('position: $position'),
                           ],
                         ),
                       ],
@@ -847,10 +1320,16 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'Patient presented with complete edentulism of maxillary arch. '
-                          'After CBCT planning, 4 BLX implants were placed (2 axial + 2 tilted at 30°). '
-                          'Provisional bridge delivered same day at 35 Ncm. Final zirconia bridge placed at 6 months. '
-                          'ISQ values at loading: 72–78.',
+                          summaryText,
+                          style: GoogleFonts.cairo(
+                            fontSize: 14,
+                            color: const Color(0xFF4B5563),
+                            height: 1.45,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          caseSummary,
                           style: GoogleFonts.cairo(
                             fontSize: 14,
                             color: const Color(0xFF4B5563),
@@ -867,35 +1346,27 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        SizedBox(
-                          height: 94,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: const [
-                              _GalleryThumb(
-                                gradient: [Color(0xFF3A0C10), Color(0xFFD9072D)],
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (thumbnailUrl.isNotEmpty)
+                              _statusChip('thumbnail'),
+                            if (videoUrl.isNotEmpty) _statusChip('video'),
+                            if (pdfUrl.isNotEmpty) _statusChip('pdf'),
+                            if (images.isNotEmpty) _statusChip('images: ${images.length}'),
+                            if (thumbnailUrl.isEmpty &&
+                                videoUrl.isEmpty &&
+                                pdfUrl.isEmpty &&
+                                images.isEmpty)
+                              Text(
+                                'No media attached for this case',
+                                style: GoogleFonts.cairo(
+                                  fontSize: 12,
+                                  color: const Color(0xFF6B7280),
+                                ),
                               ),
-                              SizedBox(width: 10),
-                              _GalleryThumb(
-                                gradient: [Color(0xFF1E3A8A), Color(0xFF4338CA)],
-                              ),
-                              SizedBox(width: 10),
-                              _GalleryThumb(
-                                gradient: [Color(0xFF4C1D95), Color(0xFFE11D48)],
-                                label: '▶ Video',
-                              ),
-                              SizedBox(width: 10),
-                              _GalleryThumb(pdf: true, label: '📄 PDF'),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Container(
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF9CA3AF),
-                            borderRadius: BorderRadius.circular(99),
-                          ),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         SizedBox(
@@ -931,8 +1402,8 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
     );
   }
 
-  Widget _mediaTag(String text) {
-    return Container(
+  Widget _mediaTag(String text, {VoidCallback? onTap}) {
+    final child = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.45),
@@ -943,6 +1414,40 @@ class _ClinicalCaseDetailScreenState extends State<ClinicalCaseDetailScreen> {
         style: GoogleFonts.cairo(
           color: Colors.white,
           fontSize: 12.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+    if (onTap == null) return child;
+    return GestureDetector(onTap: onTap, child: child);
+  }
+
+  Color _parseHexColor(String? hex, {required Color fallback}) {
+    if (hex == null || hex.trim().isEmpty) return fallback;
+    final clean = hex.trim().replaceAll('#', '');
+    if (clean.length == 6) {
+      final value = int.tryParse('FF$clean', radix: 16);
+      if (value != null) return Color(value);
+    } else if (clean.length == 8) {
+      final value = int.tryParse(clean, radix: 16);
+      if (value != null) return Color(value);
+    }
+    return fallback;
+  }
+
+  Widget _statusChip(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFD1D5DB)),
+      ),
+      child: Text(
+        text,
+        style: GoogleFonts.cairo(
+          fontSize: 12,
+          color: const Color(0xFF374151),
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -982,97 +1487,3 @@ class _MetaBlock extends StatelessWidget {
   }
 }
 
-class _BeforeAfterCard extends StatelessWidget {
-  const _BeforeAfterCard({
-    required this.title,
-    required this.background,
-    required this.emoji,
-  });
-
-  final String title;
-  final Color background;
-  final String emoji;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD1D5DB)),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 3),
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
-            ),
-            child: Center(
-              child: Text(
-                title,
-                style: GoogleFonts.cairo(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ),
-          SizedBox(
-            height: 100,
-            child: Center(
-              child: Text(emoji, style: const TextStyle(fontSize: 40)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _GalleryThumb extends StatelessWidget {
-  const _GalleryThumb({
-    this.gradient,
-    this.label,
-    this.pdf = false,
-  });
-
-  final List<Color>? gradient;
-  final String? label;
-  final bool pdf;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 100,
-      height: 94,
-      decoration: BoxDecoration(
-        color: pdf ? const Color(0xFFF2E8E8) : null,
-        gradient: gradient != null
-            ? LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: gradient!,
-              )
-            : null,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: pdf ? const Color(0xFFE5BDBD) : Colors.transparent,
-        ),
-      ),
-      child: Center(
-        child: Text(
-          label ?? '',
-          style: GoogleFonts.cairo(
-            color: pdf ? AppColors.primary : Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
-}
