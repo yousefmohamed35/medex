@@ -6,6 +6,7 @@ class CommunityPost {
   final String authorTitle;
   final String content;
   final String? imageUrl;
+  final String? videoUrl;
   final DateTime createdAt;
   int likesCount;
   int commentsCount;
@@ -22,6 +23,7 @@ class CommunityPost {
     this.authorTitle = '',
     required this.content,
     this.imageUrl,
+    this.videoUrl,
     required this.createdAt,
     this.likesCount = 0,
     this.commentsCount = 0,

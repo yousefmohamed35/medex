@@ -34,6 +34,31 @@ class UploadService {
     }
   }
 
+  /// Upload a video file. Returns URL path for use as post media.
+  Future<String> uploadVideo(File file) async {
+    try {
+      final response = await ApiClient.instance.postMultipart(
+        ApiEndpoints.upload,
+        fields: {'type': 'video'},
+        files: {'video': file},
+        requireAuth: true,
+      );
+      final url = response['url']?.toString() ??
+          (response['data'] is Map
+              ? (response['data'] as Map)['url']?.toString()
+              : null);
+      if (url != null && url.isNotEmpty) {
+        return url;
+      }
+      throw Exception(response['message'] ?? 'Upload failed');
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ UploadService.uploadVideo: $e');
+      }
+      rethrow;
+    }
+  }
+
   /// Upload a PDF file. Returns URL path for use as fileUrl.
   Future<String> uploadPdf(File file) async {
     try {

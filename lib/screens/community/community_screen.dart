@@ -112,6 +112,57 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
+  String? _alternateMediaUrl(String? url) {
+    if (url == null || url.isEmpty) return null;
+    if (url.contains('/api/uploads/')) {
+      return url.replaceFirst('/api/uploads/', '/uploads/');
+    }
+    if (url.contains('/uploads/')) {
+      return url.replaceFirst('/uploads/', '/api/uploads/');
+    }
+    return null;
+  }
+
+  Widget _buildPostImage(String imageUrl) {
+    final fallbackUrl = _alternateMediaUrl(imageUrl);
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      width: double.infinity,
+      height: 220,
+      color: Colors.grey[200],
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, progress) {
+          if (progress == null) return child;
+          return const Center(child: CircularProgressIndicator());
+        },
+        errorBuilder: (_, __, ___) {
+          if (fallbackUrl != null && fallbackUrl != imageUrl) {
+            return Image.network(
+              fallbackUrl,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Icon(
+                Icons.image_not_supported_outlined,
+                size: 48,
+                color: Colors.grey[400],
+              ),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return const Center(child: CircularProgressIndicator());
+              },
+            );
+          }
+          return Icon(
+            Icons.image_not_supported_outlined,
+            size: 48,
+            color: Colors.grey[400],
+          );
+        },
+      ),
+    );
+  }
+
   void _showReactionPicker(String postId) {
     showModalBottomSheet(
       context: context,
@@ -269,7 +320,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               slivers: [
                 _buildAppBar(isAr),
                 SliverToBoxAdapter(child: _buildCreatePostCard(isAr)),
-                SliverToBoxAdapter(child: _buildStorySection()),
+                //  SliverToBoxAdapter(child: _buildStorySection()),
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -289,7 +340,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 ),
               ],
             ),
-            // BottomNav(activeTab: 'community'),
+            const BottomNav(activeTab: 'community'),
           ],
         ),
       ),
@@ -680,15 +731,38 @@ class _CommunityScreenState extends State<CommunityScreen> {
             ),
           ),
 
-          // Post image placeholder
-          if (post.imageUrl != null && post.imageUrl!.isNotEmpty)
+          if (post.videoUrl != null && post.videoUrl!.isNotEmpty)
             Container(
               margin: const EdgeInsets.only(top: 12),
               width: double.infinity,
               height: 220,
-              color: Colors.grey[200],
-              child: Icon(Icons.image, size: 48, color: Colors.grey[400]),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.play_circle_fill_rounded,
+                    size: 56,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isAr ? 'تم إرفاق فيديو' : 'Video attached',
+                    style: GoogleFonts.cairo(
+                      fontSize: 14,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
+          // Post image
+          if (post.imageUrl != null && post.imageUrl!.isNotEmpty)
+            _buildPostImage(post.imageUrl!),
 
           // Reactions & counts
           Padding(
