@@ -277,4 +277,13 @@ class ApiEndpoints {
   static String cancelStoreOrder(String orderId) =>
       '$baseUrl/store/orders/$orderId/cancel';
   static String get storeValidateCoupon => '$baseUrl/store/coupons/validate';
+
+  // Dental Challenge
+  static String get dentalChallengeHome => '$baseUrl/dental-challenge/home';
+  static String dentalChallengeJoin(String challengeId) =>
+      '$baseUrl/dental-challenge/$challengeId/join';
+  static String get dentalChallengeBrands => '$baseUrl/dental-challenge/brands';
+  static String dentalChallengeSubmissions(String challengeId) =>
+      '$baseUrl/dental-challenge/$challengeId/submissions';
+  static String get dentalChallengeWinners => '$baseUrl/dental-challenge/winners';
 }
