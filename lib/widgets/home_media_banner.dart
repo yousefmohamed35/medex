@@ -14,6 +14,12 @@ class HomeMediaBanner extends StatefulWidget {
     this.isAsset = true,
     this.height = 200,
     this.onTap,
+    this.badgeText,
+    this.titleText,
+    this.subtitleText,
+    this.primaryButtonText,
+    this.playButtonText,
+    this.showPlayButton = true,
   });
 
   final bool isAr;
@@ -22,6 +28,12 @@ class HomeMediaBanner extends StatefulWidget {
   final bool isAsset;
   final double height;
   final VoidCallback? onTap;
+  final String? badgeText;
+  final String? titleText;
+  final String? subtitleText;
+  final String? primaryButtonText;
+  final String? playButtonText;
+  final bool showPlayButton;
 
   @override
   State<HomeMediaBanner> createState() => _HomeMediaBannerState();
@@ -108,17 +120,13 @@ class _HomeMediaBannerState extends State<HomeMediaBanner> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         height: widget.height,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFD42535), Color(0xFF8C1722)],
-          ),
+          color: const Color(0xFF171717),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(0.18),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
@@ -130,72 +138,83 @@ class _HomeMediaBannerState extends State<HomeMediaBanner> {
                 child: _buildMedia(),
               ),
             ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      const Color(0xFF272727).withOpacity(0.72),
+                      const Color(0xFF3F0000).withOpacity(0.88),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (widget.showPlayButton)
+              const Center(
+                child: _CenteredPlayButton(),
+              ),
             Positioned(
-              left: widget.isAr ? null : 20,
-              right: widget.isAr ? 20 : null,
-              top: 0,
-              bottom: 0,
+              left: widget.isAr ? null : 18,
+              right: widget.isAr ? 18 : null,
+              bottom: 14,
               child: SizedBox(
-                width: MediaQuery.of(context).size.width * 0.5,
+                width: MediaQuery.of(context).size.width * 0.72,
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                      widget.isAr ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        'MEDEX',
+                        (widget.badgeText?.trim().isNotEmpty ?? false)
+                            ? widget.badgeText!.trim()
+                            : (widget.isAr ? 'مرحبا في ميديكس' : 'WELCOME TO MEDEX'),
                         style: GoogleFonts.cairo(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
                           color: Colors.white,
-                          letterSpacing: 2,
+                          height: 1,
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      widget.isAr
-                          ? 'منتجات طب أسنان\nمتميزة'
-                          : 'Premium Dental\nProducts',
+                      (widget.titleText?.trim().isNotEmpty ?? false)
+                          ? widget.titleText!.trim()
+                          : (widget.isAr
+                              ? 'أول منصة ذكية\nلزراعة الأسنان'
+                              : 'The First Smart Dental Implant Platform'),
                       style: GoogleFonts.cairo(
                         fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w800,
                         color: Colors.white,
-                        height: 1.3,
+                        height: 1.12,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: widget.isAr ? TextAlign.right : TextAlign.left,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 3),
                     Text(
-                      widget.isAr
-                          ? 'أفضل المنتجات من إيطاليا وتركيا وكوريا'
-                          : 'Top products from Italy, Turkey & Korea',
+                      (widget.subtitleText?.trim().isNotEmpty ?? false)
+                          ? widget.subtitleText!.trim()
+                          : (widget.isAr ? 'دقيقتان - إنجليزي / عربي' : '2 min · English / Arabic'),
                       style: GoogleFonts.cairo(
                         fontSize: 11,
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        widget.isAr ? 'تسوق الآن' : 'Shop Now',
-                        style: GoogleFonts.cairo(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -234,6 +253,27 @@ class _HomeMediaBannerState extends State<HomeMediaBanner> {
       widget.mediaPath,
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => Container(color: Colors.black12),
+    );
+  }
+}
+
+class _CenteredPlayButton extends StatelessWidget {
+  const _CenteredPlayButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.95),
+        shape: BoxShape.circle,
+      ),
+      child: const Icon(
+        Icons.play_arrow_rounded,
+        color: AppColors.primary,
+        size: 34,
+      ),
     );
   }
 }
