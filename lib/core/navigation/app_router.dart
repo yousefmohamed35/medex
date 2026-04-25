@@ -322,12 +322,14 @@ class AppRouter {
         pageBuilder: (context, state) {
           final brand =
               int.tryParse(state.uri.queryParameters['brand'] ?? '') ?? 0;
+          final all = state.uri.queryParameters['all'] == '1';
           final cat = state.uri.queryParameters['cat'] ?? 'Implant Systems';
           return _buildPageWithTransition(
             key: state.pageKey,
             child: StoreCategoryListingScreen(
               initialBrandRail: brand,
               categoryTitle: cat,
+              showAllProductsInSection: all,
             ),
           );
         },

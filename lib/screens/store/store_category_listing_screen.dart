@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import '../../core/design/app_colors.dart';
 import '../../core/navigation/route_names.dart';
 import '../../data/sample_products.dart';
 import '../../models/product.dart';
 import '../../services/cart_service.dart';
+import '../../services/store_service.dart';
 import '../../widgets/bottom_nav.dart';
 
 /// Store “all categories” product list: red app bar, brand rail, category header,
@@ -15,10 +17,14 @@ class StoreCategoryListingScreen extends StatefulWidget {
     super.key,
     required this.initialBrandRail,
     required this.categoryTitle,
+    this.showAllProductsInSection = false,
   });
 
   final int initialBrandRail;
   final String categoryTitle;
+
+  /// When true, list every product for the selected brand rail (all categories).
+  final bool showAllProductsInSection;
 
   @override
   State<StoreCategoryListingScreen> createState() =>
@@ -29,19 +35,47 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
   late int _railIndex;
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _loadingProducts = true;
+  List<Product> _mergedProducts = [];
 
+  /// Same order and semantics as [StoreScreen] side rail.
   static const List<_ListingRail> _rails = [
-    _ListingRail('B&B Dental', Icons.medical_services_outlined),
-    _ListingRail('Macros Implants', Icons.grid_view_rounded),
+    _ListingRail('B&B Dental', Icons.widgets_outlined),
+    _ListingRail('Macros Implants', Icons.event_outlined),
     _ListingRail('Powerbone', Icons.shield_outlined),
-    _ListingRail('MCTBIO Mplant', Icons.biotech_outlined),
-    _ListingRail('Biomaterials', Icons.layers_outlined),
+    _ListingRail('MCTBIO Implant', Icons.adjust_rounded),
+    _ListingRail('Biomaterials', Icons.sync_outlined),
   ];
 
   @override
   void initState() {
     super.initState();
     _railIndex = widget.initialBrandRail.clamp(0, _rails.length - 1);
+    _loadProducts();
+  }
+
+  Future<void> _loadProducts() async {
+    try {
+      final api = await StoreService.instance.getProducts(perPage: 100);
+      if (!mounted) return;
+      final byId = <String, Product>{};
+      for (final p in SampleProducts.products) {
+        byId[p.id] = p;
+      }
+      for (final p in api) {
+        byId[p.id] = p;
+      }
+      setState(() {
+        _mergedProducts = byId.values.toList();
+        _loadingProducts = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _mergedProducts = List<Product>.from(SampleProducts.products);
+        _loadingProducts = false;
+      });
+    }
   }
 
   @override
@@ -54,10 +88,11 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
       s.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
 
   bool _brandMatches(Product p, int rail) {
-    final b = p.brand.toLowerCase();
+    final b = p.brand.toLowerCase().trim();
+    if (b.isEmpty) return true;
     switch (rail) {
       case 0:
-        return b.contains('b&b') || b.contains('bb dental');
+        return b.contains('b&b') || b.contains('bb');
       case 1:
         return b.contains('macros');
       case 2:
@@ -66,6 +101,8 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
         return b.contains('mctbio');
       case 4:
         return b.contains('biomaterial') ||
+            b.contains('graft') ||
+            b.contains('regenerative') ||
             b.contains('dora') ||
             b.contains('osseo');
       default:
@@ -74,15 +111,19 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
   }
 
   bool _categoryMatches(Product p) {
+    if (widget.showAllProductsInSection) return true;
     final want = _canon(widget.categoryTitle.replaceAll('\n', ' '));
+    if (want.isEmpty) return true;
     final c = _canon(p.category);
     final ca = _canon(p.categoryAr);
     return c == want || ca == want || c.contains(want) || want.contains(c);
   }
 
   List<Product> get _filtered {
+    final source =
+        _mergedProducts.isEmpty ? SampleProducts.products : _mergedProducts;
     final q = _searchQuery.trim().toLowerCase();
-    return SampleProducts.products.where((p) {
+    return source.where((p) {
       if (!_brandMatches(p, _railIndex) || !_categoryMatches(p)) return false;
       if (q.isEmpty) return true;
       final name = '${p.name} ${p.nameAr}'.toLowerCase();
@@ -94,8 +135,9 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
   Widget build(BuildContext context) {
     final isAr = Localizations.localeOf(context).languageCode == 'ar';
     final products = _filtered;
-    final categoryTitle =
-        widget.categoryTitle.replaceAll('\n', ' ').trim();
+    final categoryTitle = widget.showAllProductsInSection
+        ? (isAr ? 'كل المنتجات' : 'All products')
+        : widget.categoryTitle.replaceAll('\n', ' ').trim();
 
     return Scaffold(
       backgroundColor: const Color(0xFFE9EBF0),
@@ -116,32 +158,38 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
                           _buildListHeader(context, isAr, categoryTitle,
                               products.length),
                           Expanded(
-                            child: products.isEmpty
-                                ? Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(24),
-                                      child: Text(
-                                        isAr
-                                            ? 'لا توجد منتجات في هذا التصنيف'
-                                            : 'No products in this category',
-                                        textAlign: TextAlign.center,
-                                        style: GoogleFonts.cairo(
-                                          fontSize: 15,
-                                          color: const Color(0xFF667085),
+                            child: _loadingProducts
+                                ? const Center(child: CircularProgressIndicator())
+                                : products.isEmpty
+                                    ? Center(
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(24),
+                                          child: Text(
+                                            isAr
+                                                ? (widget.showAllProductsInSection
+                                                    ? 'لا توجد منتجات في هذا القسم'
+                                                    : 'لا توجد منتجات في هذا التصنيف')
+                                                : (widget.showAllProductsInSection
+                                                    ? 'No products in this section'
+                                                    : 'No products in this category'),
+                                            textAlign: TextAlign.center,
+                                            style: GoogleFonts.cairo(
+                                              fontSize: 15,
+                                              color: const Color(0xFF667085),
+                                            ),
+                                          ),
                                         ),
+                                      )
+                                    : ListView.separated(
+                                        padding: const EdgeInsets.fromLTRB(
+                                            10, 8, 10, 100),
+                                        itemCount: products.length,
+                                        separatorBuilder: (_, __) =>
+                                            const SizedBox(height: 8),
+                                        itemBuilder: (context, i) =>
+                                            _buildProductRow(
+                                                context, products[i], isAr),
                                       ),
-                                    ),
-                                  )
-                                : ListView.separated(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        10, 8, 10, 100),
-                                    itemCount: products.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: 8),
-                                    itemBuilder: (context, i) =>
-                                        _buildProductRow(
-                                            context, products[i], isAr),
-                                  ),
                           ),
                         ],
                       ),
@@ -301,8 +349,8 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
               decoration: BoxDecoration(
                 color: active ? const Color(0xFFFFF0F1) : Colors.transparent,
                 borderRadius: BorderRadius.circular(10),
-                border: Border(
-                  left: BorderSide(
+                border: BorderDirectional(
+                  end: BorderSide(
                     color: active ? AppColors.primary : Colors.transparent,
                     width: 3,
                   ),
@@ -350,10 +398,10 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
   }
 
   String _railAr(String label) {
-    if (label == 'B&B Dental') return 'بي آند بي';
-    if (label.contains('Macros')) return 'ماكروس';
+    if (label.contains('B&B')) return 'بي آند بي';
+    if (label.contains('Macros')) return 'ماكروز';
     if (label.contains('Powerbone')) return 'باوربون';
-    if (label.contains('MCTBIO')) return 'إم سي تي بيو';
+    if (label.contains('MCTBIO')) return 'إم سي تي بايو';
     if (label.contains('Biomaterials')) return 'مواد حيوية';
     return label;
   }
@@ -365,64 +413,57 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
     int count,
   ) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 10, 6),
+      padding: const EdgeInsets.fromLTRB(4, 10, 8, 6),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              GestureDetector(
+                onTap: () {
+                  if (Navigator.of(context).canPop()) {
+                    context.pop();
+                  } else {
+                    context.go(RouteNames.store);
+                  }
+                },
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2, left: 4, right: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 2),
+                      Text(
+                        isAr ? 'رجوع' : 'Back',
+                        style: GoogleFonts.cairo(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        if (Navigator.of(context).canPop()) {
-                          context.pop();
-                        } else {
-                          context.go(RouteNames.store);
-                        }
-                      },
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            size: 14,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            isAr ? 'رجوع' : 'Back',
-                            style: GoogleFonts.cairo(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      categoryTitle,
-                      style: GoogleFonts.cairo(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF101828),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isAr ? '$count منتج' : '$count Products',
-                      style: GoogleFonts.cairo(
-                        fontSize: 12,
-                        color: const Color(0xFF667085),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  categoryTitle,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.cairo(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: const Color(0xFF101828),
+                    height: 1.2,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               OutlinedButton.icon(
@@ -440,19 +481,33 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
                   foregroundColor: const Color(0xFF344054),
                   side: const BorderSide(color: Color(0xFFD0D5DD)),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                icon: const Icon(Icons.tune_rounded, size: 16),
+                icon: const Icon(Icons.filter_list_rounded, size: 18),
                 label: Text(
                   isAr ? 'تصفية' : 'Filter',
                   style: GoogleFonts.cairo(
-                      fontWeight: FontWeight.w700, fontSize: 12),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            isAr ? '$count منتج' : '$count Products',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.cairo(
+              fontSize: 12.5,
+              color: const Color(0xFF667085),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ],
       ),
@@ -470,12 +525,28 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
 
   Widget _buildProductRow(BuildContext context, Product p, bool isAr) {
     final name = isAr ? p.nameAr : p.name;
-    final priceStr = isAr ? '${p.price.toInt()} ج.م' : 'EGP ${p.price.toInt()}';
+    final egp = NumberFormat('#,###', 'en_US').format(p.price.toInt());
+    final priceStr = isAr ? '$egp ج.م' : 'EGP $egp';
 
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
-      child: Padding(
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE4E7EC)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         child: Row(
           children: [
@@ -495,7 +566,7 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
                         Text(
                           name,
                           style: GoogleFonts.cairo(
-                            fontSize: 13.5,
+                            fontSize: 13,
                             fontWeight: FontWeight.w800,
                             color: const Color(0xFF101828),
                             height: 1.2,
@@ -509,7 +580,7 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
                               ? (isAr ? 'متوفر' : 'In Stock')
                               : (isAr ? 'غير متوفر' : 'Out of Stock'),
                           style: GoogleFonts.cairo(
-                            fontSize: 11,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: p.isAvailable
                                 ? const Color(0xFF16A34A)
@@ -520,7 +591,7 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
                         Text(
                           priceStr,
                           style: GoogleFonts.cairo(
-                            fontSize: 15,
+                            fontSize: 15.5,
                             fontWeight: FontWeight.w900,
                             color: AppColors.primary,
                           ),
@@ -563,6 +634,7 @@ class _StoreCategoryListingScreenState extends State<StoreCategoryListingScreen>
               ),
             ),
           ],
+        ),
         ),
       ),
     );
