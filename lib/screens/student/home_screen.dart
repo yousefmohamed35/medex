@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _featuredCourses = [];
   List<Map<String, dynamic>> _popularCourses = [];
   List<Map<String, dynamic>> _continueLearning = [];
+  List<Map<String, dynamic>> _quickAccessItems = [];
   Map<String, dynamic>? _heroBanner;
   List<ProductCategory> _storeCategories = [];
   List<Product> _storeProducts = [];
@@ -120,6 +121,8 @@ class _HomeScreenState extends State<HomeScreen> {
             List<Map<String, dynamic>>.from(homeData['popular_courses'] ?? []);
         _continueLearning = List<Map<String, dynamic>>.from(
             homeData['continue_learning'] ?? []);
+        _quickAccessItems =
+            List<Map<String, dynamic>>.from(homeData['quick_access'] ?? []);
         _storeCategories = storeCategories;
         _storeProducts = storeProducts;
         _isLoading = false;
@@ -176,11 +179,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 mediaType: _resolveBannerType(),
                                 mediaPath: _resolveBannerPath(),
                                 isAsset: _resolveBannerIsAsset(),
-                                onTap: () => context.go(RouteNames.store),
+                                badgeText: _resolveBannerBadge(isAr),
+                                titleText: _resolveBannerTitle(isAr),
+                                subtitleText: _resolveBannerSubtitle(isAr),
+                                primaryButtonText:
+                                    _resolveBannerPrimaryButtonText(isAr),
+                                playButtonText:
+                                    _resolveBannerPlayButtonText(isAr),
+                                showPlayButton: _resolveBannerType() ==
+                                    HomeBannerMediaType.video,
+                                onTap: _onHeroBannerTap,
                               ),
                               const SizedBox(height: 24),
                               HomeQuickAccess(
                                 isAr: isAr,
+                                items: _quickAccessItems,
                               ),
                               const SizedBox(height: 20),
                               HomePlatformIntroCard(isAr: isAr),
@@ -391,6 +404,111 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _resolveBannerIsAsset() {
     final path = _resolveBannerPath().toLowerCase();
     return !(path.startsWith('http://') || path.startsWith('https://'));
+  }
+
+  String _pickLocalizedBannerValue({
+    required bool isAr,
+    required String baseKey,
+    String? fallback,
+  }) {
+    final direct = _heroBanner?[baseKey];
+    if (direct is String && direct.trim().isNotEmpty) return direct.trim();
+
+    final localizedMap = _heroBanner?['${baseKey}_localized'];
+    if (localizedMap is Map<String, dynamic>) {
+      final localized =
+          isAr ? localizedMap['ar']?.toString() : localizedMap['en']?.toString();
+      if (localized != null && localized.trim().isNotEmpty) {
+        return localized.trim();
+      }
+    }
+
+    final langKey = isAr ? '${baseKey}_ar' : '${baseKey}_en';
+    final langDynamicValue = _heroBanner?[langKey];
+    final langValue = langDynamicValue?.toString();
+    if (langValue != null && langValue.trim().isNotEmpty) {
+      return langValue.trim();
+    }
+
+    final commonValue = _heroBanner?[baseKey]?.toString();
+    if (commonValue != null && commonValue.trim().isNotEmpty) {
+      return commonValue.trim();
+    }
+
+    return fallback ?? '';
+  }
+
+  String _resolveBannerBadge(bool isAr) {
+    return _pickLocalizedBannerValue(
+      isAr: isAr,
+      baseKey: 'badge_text',
+      fallback: 'MEDEX',
+    );
+  }
+
+  String _resolveBannerTitle(bool isAr) {
+    return _pickLocalizedBannerValue(
+      isAr: isAr,
+      baseKey: 'title',
+      fallback: isAr
+          ? 'فيديو ترحيبي سريع\nبتطبيق Medex'
+          : 'Quick Welcome Video\nAbout Medex App',
+    );
+  }
+
+  String _resolveBannerSubtitle(bool isAr) {
+    return _pickLocalizedBannerValue(
+      isAr: isAr,
+      baseKey: 'subtitle',
+      fallback: isAr
+          ? 'شاهد فيديو قصير يعرّفك بخدمات ومزايا التطبيق'
+          : 'Watch a short clip to discover app features',
+    );
+  }
+
+  String _resolveBannerPrimaryButtonText(bool isAr) {
+    return _pickLocalizedBannerValue(
+      isAr: isAr,
+      baseKey: 'primary_button_text',
+      fallback: isAr ? 'شاهد الآن' : 'Watch Now',
+    );
+  }
+
+  String _resolveBannerPlayButtonText(bool isAr) {
+    return _pickLocalizedBannerValue(
+      isAr: isAr,
+      baseKey: 'play_button_text',
+      fallback: isAr ? 'تشغيل' : 'Play',
+    );
+  }
+
+  void _onHeroBannerTap() {
+    // Backend can control banner destination through hero_banner.cta_route.
+    final rawRoute = _heroBanner?['cta_route']?.toString().trim();
+    final allowedRoutes = <String>{
+      RouteNames.home,
+      RouteNames.courses,
+      RouteNames.progress,
+      RouteNames.dashboard,
+      RouteNames.allCourses,
+      RouteNames.medexAcademy,
+      RouteNames.medexOffers,
+      RouteNames.clinicalCases,
+      RouteNames.productLearningHub,
+      RouteNames.eventsExhibitions,
+      RouteNames.dentalChallenge,
+      RouteNames.returnsExchanges,
+      RouteNames.returnsPolicies,
+      RouteNames.medexAiAssistant,
+      RouteNames.community,
+      RouteNames.implantCommunity,
+      RouteNames.notifications,
+    };
+
+    final targetRoute = (rawRoute != null && allowedRoutes.contains(rawRoute))
+        ? rawRoute
+        : RouteNames.medexAcademy;
+    context.go(targetRoute);
   }
 
   List<Product> _getFeaturedProducts() {
